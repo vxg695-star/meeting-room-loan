@@ -10,9 +10,18 @@
         body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        #loading-overlay { position:fixed;inset:0;background:rgba(15,23,42,0.7);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:12px; }
+        .spinner { width:40px;height:40px;border:4px solid rgba(255,255,255,0.2);border-top-color:#60a5fa;border-radius:50%;animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+
+    <!-- 載入中遮罩 -->
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="text-sm font-medium text-blue-200">連線至 Firebase 資料庫中…</div>
+    </div>
 
     <header class="bg-[#1e293b] text-white px-6 py-4 flex justify-between items-center shadow-md">
         <div class="flex items-center space-x-3">
@@ -241,8 +250,29 @@
         </div>
     </div>
 
+    <!-- ======= Firebase SDK ======= -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getDatabase, ref, set, get, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-    <script>
+        // ============================================================
+        // ⚠️  請將下方的 firebaseConfig 換成你自己的 Firebase 設定  ⚠️
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_Av0jEQtbO_CZ7mDF3nmJbMsAWiYPDiI",
+            authDomain: "meeting-room-loan.firebaseapp.com",
+            databaseURL: "https://meeting-room-loan-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "meeting-room-loan",
+            storageBucket: "meeting-room-loan.firebasestorage.app",
+            messagingSenderId: "997274771745",
+            appId: "1:997274771745:web:ecd81a6c3e963afc7d1e60",
+            measurementId: "G-LVNFTW3ZCW"
+        };
+        // ============================================================
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
         const LOCATION_OPTIONS = [
             "國際會議室", "552", "553", "554", "556", "558", "561", "563",
             "教1", "教2", "辦１", "電腦教室", "331", "332", "研究大樓", "白宮", "借用者辦公室", "其他"
@@ -261,54 +291,104 @@
         };
         const staffList = Object.keys(USER_DB);
 
-        // 改為物件陣列結構，以便於後台可以直接動態跟動前後順序 (▲ / ▼ 排序功能)
         const defaultInventoryArray = [
             { name: "簡報筆", limit: 10 },
             { name: "鏡頭(小)", limit: 5 },
             { name: "鏡頭(大)", limit: 3 },
-            { name: "Apple轉接頭-Type-C", limit: 8 }, 
-            { name: "音響", limit: 4 }, 
-            { name: "音源線", limit: 10 }, 
-            { name: "摺疊桌", limit: 15 }, 
-            { name: "折合椅", limit: 50 }, 
-            { name: "HDMI線", limit: 12 }, 
-            { name: "桌牌", limit: 30 }, 
-            { name: "雷射筆", limit: 6 }, 
+            { name: "Apple轉接頭-Type-C", limit: 8 },
+            { name: "音響", limit: 4 },
+            { name: "音源線", limit: 10 },
+            { name: "摺疊桌", limit: 15 },
+            { name: "折合椅", limit: 50 },
+            { name: "HDMI線", limit: 12 },
+            { name: "桌牌", limit: 30 },
+            { name: "雷射筆", limit: 6 },
             { name: "延長線", limit: 10 }
         ];
 
-        const defaultLoans = [
-            { id: "L001", status: "待領取", borrower: "王小明", dept: "行政部", phone: "123", useDate: "2026-06-30", period: "10:30 ～ 11:00", location: "552", items: { "簡報筆": 2, "鏡頭(小)": 1 }, pickupTime: "2026-06-30T10:00", returnTime: "2026-06-30T17:00", handler: "—", notes: "" },
-            { id: "L002", status: "已歸還", borrower: "黃雅婷", dept: "A-007", phone: "2210", useDate: "2026-06-24", period: "整天", location: "白宮", items: { "音響": 1, "摺疊桌": 3 }, pickupTime: "2026-06-24T08:00", returnTime: "2026-06-25T11:43", handler: "李偲詩", notes: "戶外活動" },
-            { id: "L003", status: "借用中", borrower: "林佩珊", dept: "A-021", phone: "1234", useDate: "2026-06-26", period: "8:00 ～ 12:00", location: "國際會議室", items: { "簡報筆": 1, "HDMI線": 1 }, pickupTime: "2026-06-26T08:00", returnTime: "2026-06-26T12:30", handler: "—", notes: "記者會用" }
-        ];
-
-        let inventoryArray = JSON.parse(localStorage.getItem('borrow_inventory_arr_v6')) || defaultInventoryArray;
-        let loans = JSON.parse(localStorage.getItem('borrow_loans_v6')) || defaultLoans;
+        let inventoryArray = [];
+        let loans = [];
         let currentUser = JSON.parse(localStorage.getItem('borrow_curr_user_v6')) || null;
         let currentFilterStatus = "全部";
         let activeTab = "loan-list";
 
-        window.onload = function() {
-            const today = new Date();
-            const todayStr = today.toISOString().split('T')[0];
-            document.getElementById('current-date').innerText = todayStr.replace(/-/g, '/');
-            document.getElementById('search-start-date').value = todayStr;
+        // ---- Firebase 資料初始化 ----
+        async function initFirebase() {
+            try {
+                // 初始化庫存（若 Firebase 無資料，寫入預設值）
+                const invSnap = await get(ref(db, 'inventory'));
+                if (!invSnap.exists()) {
+                    await set(ref(db, 'inventory'), defaultInventoryArray);
+                }
 
-            updateLoginStatusUI();
-            updateCounts();
-            renderLoanList();
-            renderInventory();
-            buildLocationDropdown();
-            refreshToolbarLayout();
-        };
+                // 初始化借用單（若 Firebase 無資料，寫入範例資料）
+                const loansSnap = await get(ref(db, 'loans'));
+                if (!loansSnap.exists()) {
+                    const defaultLoans = [
+                        { id: "L001", status: "待領取", borrower: "王小明", dept: "行政部", phone: "123", useDate: "2026-06-30", period: "10:30 ～ 11:00", location: "552", items: { "簡報筆": 2, "鏡頭(小)": 1 }, pickupTime: "2026-06-30T10:00", returnTime: "2026-06-30T17:00", handler: "—", notes: "" },
+                        { id: "L002", status: "已歸還", borrower: "黃雅婷", dept: "A-007", phone: "2210", useDate: "2026-06-24", period: "整天", location: "白宮", items: { "音響": 1, "摺疊桌": 3 }, pickupTime: "2026-06-24T08:00", returnTime: "2026-06-25T11:43", handler: "李偲詩", notes: "戶外活動" },
+                        { id: "L003", status: "借用中", borrower: "林佩珊", dept: "A-021", phone: "1234", useDate: "2026-06-26", period: "8:00 ～ 12:00", location: "國際會議室", items: { "簡報筆": 1, "HDMI線": 1 }, pickupTime: "2026-06-26T08:00", returnTime: "2026-06-26T12:30", handler: "—", notes: "記者會用" }
+                    ];
+                    const loansObj = {};
+                    defaultLoans.forEach(l => { loansObj[l.id] = l; });
+                    await set(ref(db, 'loans'), loansObj);
+                }
 
-        function saveToStorage() {
-            localStorage.setItem('borrow_inventory_arr_v6', JSON.stringify(inventoryArray));
-            localStorage.setItem('borrow_loans_v6', JSON.stringify(loans));
+                // 即時監聽 inventory 變化
+                onValue(ref(db, 'inventory'), (snap) => {
+                    if (snap.exists()) {
+                        inventoryArray = snap.val();
+                        if (!Array.isArray(inventoryArray)) {
+                            inventoryArray = Object.values(inventoryArray);
+                        }
+                    } else {
+                        inventoryArray = [...defaultInventoryArray];
+                    }
+                    renderLoanList();
+                    renderInventory();
+                    updateCounts();
+                });
+
+                // 即時監聽 loans 變化
+                onValue(ref(db, 'loans'), (snap) => {
+                    if (snap.exists()) {
+                        const raw = snap.val();
+                        loans = Object.values(raw).sort((a, b) => b.id.localeCompare(a.id));
+                    } else {
+                        loans = [];
+                    }
+                    renderLoanList();
+                    renderInventory();
+                    updateCounts();
+                });
+
+                document.getElementById('loading-overlay').style.display = 'none';
+            } catch (e) {
+                document.getElementById('loading-overlay').innerHTML = `
+                    <div style="background:#1e293b;padding:24px 32px;border-radius:12px;max-width:400px;text-align:center;">
+                        <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+                        <div style="font-weight:bold;font-size:1.1rem;margin-bottom:8px;">Firebase 連線失敗</div>
+                        <div style="color:#94a3b8;font-size:0.85rem;">請確認 index.html 內的 firebaseConfig 設定是否正確填入。</div>
+                    </div>
+                `;
+            }
         }
 
-        // 輔助函式：自陣列結構快速獲取限制上限
+        // ---- 儲存到 Firebase ----
+        async function saveToStorage() {
+            // 儲存 inventory（陣列直接存）
+            await set(ref(db, 'inventory'), inventoryArray);
+            // 儲存 loans（用 id 當 key 轉成物件）
+            const loansObj = {};
+            loans.forEach(l => { loansObj[l.id] = l; });
+            await set(ref(db, 'loans'), loansObj);
+        }
+
+        // 讓 HTML inline onclick 可以呼叫這些函式
+        window.saveToStorage = saveToStorage;
+
+        // ---- 以下為原有邏輯（不變）----
+
         function getLimitByName(name) {
             const found = inventoryArray.find(i => i.name === name);
             return found ? found.limit : 0;
@@ -319,30 +399,26 @@
             let queryDate = targetStartDate || new Date().toISOString().split('T')[0];
             const tStart = new Date(queryDate + "T00:00:00").getTime();
             const tEnd = targetEndDate ? new Date(targetEndDate + "T23:59:59").getTime() : new Date(queryDate + "T23:59:59").getTime();
-
             let borrowedQty = 0;
             loans.forEach(loan => {
                 if (loan.id === excludeLoanId) return;
                 if (loan.status === '已歸還') return;
                 if (!loan.items[itemName]) return;
-
                 let loanStart = loan.pickupTime ? new Date(loan.pickupTime).getTime() : new Date(loan.useDate + "T00:00:00").getTime();
                 let loanEnd = loan.returnTime ? new Date(loan.returnTime).getTime() : new Date(loan.useDate + "T23:59:59").getTime();
-
                 if (loanStart <= tEnd && loanEnd >= tStart) {
                     borrowedQty += (parseInt(loan.items[itemName]) || 0);
                 }
             });
-
             const finalAvailable = totalLimit - borrowedQty;
             return finalAvailable < 0 ? 0 : finalAvailable;
         }
+        window.getAvailableQty = getAvailableQty;
 
         function handleDateFilterChange() {
             const start = document.getElementById('search-start-date').value;
             const label = document.getElementById('inventory-date-label');
             const tableTitleDate = document.getElementById('inventory-table-title-date');
-            
             if (start) {
                 label.innerText = start;
                 tableTitleDate.innerText = `${start} 當天剩餘 / 總限制`;
@@ -353,12 +429,14 @@
             renderLoanList();
             renderInventory();
         }
+        window.handleDateFilterChange = handleDateFilterChange;
 
         function clearDateSearch() {
             document.getElementById('search-start-date').value = "";
             document.getElementById('search-end-date').value = "";
             handleDateFilterChange();
         }
+        window.clearDateSearch = clearDateSearch;
 
         function switchTab(tab) {
             activeTab = tab;
@@ -366,7 +444,6 @@
             const btnInv = document.getElementById('tab-inventory');
             const panelList = document.getElementById('panel-loan-list');
             const panelInv = document.getElementById('panel-inventory');
-
             if (tab === 'loan-list') {
                 btnList.className = "flex-1 py-2 text-center font-bold rounded-lg transition text-blue-600 bg-blue-50 text-sm";
                 btnInv.className = "flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm";
@@ -381,12 +458,12 @@
             }
             refreshToolbarLayout();
         }
+        window.switchTab = switchTab;
 
         function refreshToolbarLayout() {
             const label = document.getElementById('date-search-label');
             const tip = document.getElementById('search-tip');
             const filterGroup = document.getElementById('status-filter-group');
-
             if (activeTab === 'loan-list') {
                 label.innerHTML = `<i class="fa-solid fa-filter mr-1 text-blue-500"></i> 使用日期查詢：`;
                 tip.classList.add('hidden');
@@ -402,6 +479,7 @@
             const select = document.getElementById('form-location');
             select.innerHTML = LOCATION_OPTIONS.map(opt => `<option value="${opt}">${opt === '其他' ? '其他：(自行填寫)' : opt}</option>`).join('');
         }
+        window.buildLocationDropdown = buildLocationDropdown;
 
         function handleLocationSelectChange(prefix) {
             const select = document.getElementById(`${prefix}-location`);
@@ -413,8 +491,8 @@
                 customInput.value = "";
             }
         }
+        window.handleLocationSelectChange = handleLocationSelectChange;
 
-        // --- 系統登入與權限更新 ---
         function openLoginModal() {
             const m = document.getElementById('login-modal');
             document.getElementById('login-pass').value = "";
@@ -422,6 +500,7 @@
             m.classList.remove('hidden');
             setTimeout(() => { m.classList.remove('opacity-0'); m.firstElementChild.classList.remove('scale-95'); }, 50);
         }
+        window.openLoginModal = openLoginModal;
 
         function closeLoginModal() {
             const m = document.getElementById('login-modal');
@@ -429,11 +508,11 @@
             m.firstElementChild.classList.add('scale-95');
             setTimeout(() => m.classList.add('hidden'), 200);
         }
+        window.closeLoginModal = closeLoginModal;
 
         function submitLogin() {
             const name = document.getElementById('login-user').value;
             const pass = document.getElementById('login-pass').value;
-
             if (USER_DB[name] && USER_DB[name].pass === pass) {
                 currentUser = { name: name, role: USER_DB[name].role };
                 localStorage.setItem('borrow_curr_user_v6', JSON.stringify(currentUser));
@@ -445,6 +524,7 @@
                 document.getElementById('login-error').classList.remove('hidden');
             }
         }
+        window.submitLogin = submitLogin;
 
         function handleLogout() {
             currentUser = null;
@@ -453,14 +533,16 @@
             renderLoanList();
             renderInventory();
         }
+        window.handleLogout = handleLogout;
 
         function updateLoginStatusUI() {
             const area = document.getElementById('login-status-area');
             const mgmtCard = document.getElementById('inventory-management-card');
             const statusCard = document.getElementById('inventory-status-card');
-
             if (currentUser) {
-                const roleBadge = currentUser.role === 'admin' ? '<span class="bg-red-500/20 text-red-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-red-500/30">管理者</span>' : '<span class="bg-blue-500/20 text-blue-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-blue-500/30">一般人員</span>';
+                const roleBadge = currentUser.role === 'admin'
+                    ? '<span class="bg-red-500/20 text-red-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-red-500/30">管理者</span>'
+                    : '<span class="bg-blue-500/20 text-blue-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-blue-500/30">一般人員</span>';
                 area.innerHTML = `
                     <div class="flex items-center space-x-1.5 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
                         <i class="fa-solid fa-circle-user text-amber-400 text-xs"></i>
@@ -487,6 +569,7 @@
             document.getElementById(`btn-filter-${activeIdMap[status]}`).className = "px-4 py-1.5 rounded-md text-sm font-medium transition bg-slate-800 text-white shadow-sm";
             renderLoanList();
         }
+        window.filterStatus = filterStatus;
 
         function updateCounts() {
             document.getElementById('count-all').innerText = loans.length;
@@ -495,36 +578,28 @@
             document.getElementById('count-returned').innerText = loans.filter(l => l.status === '已歸還').length;
         }
 
-        // --- 借用清單表格渲染 ---
         function renderLoanList() {
             const tbody = document.getElementById('loan-table-body');
             tbody.innerHTML = "";
-
             const startDate = document.getElementById('search-start-date').value;
             const endDate = document.getElementById('search-end-date').value;
-
             const filtered = loans.filter(item => {
                 if (currentFilterStatus !== "全部" && item.status !== currentFilterStatus) return false;
                 if (startDate && item.useDate < startDate) return false;
                 if (endDate && item.useDate > endDate) return false;
                 return true;
             });
-
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-gray-400 font-medium"><i class="fa-regular fa-folder-open mr-2 text-lg"></i>目前符合條件的借用紀錄為空</td></tr>`;
                 return;
             }
-
             filtered.forEach(item => {
                 let statusBg = "bg-yellow-50 text-yellow-700 border-yellow-200";
                 if (item.status === '借用中') statusBg = "bg-blue-50 text-blue-700 border-blue-200";
                 if (item.status === '已歸還') statusBg = "bg-emerald-50 text-emerald-700 border-emerald-200";
-
-                let statusOptions = ['待領取', '借用中', '已歸還'].map(s => 
+                let statusOptions = ['待領取', '借用中', '已歸還'].map(s =>
                     `<option value="${s}" ${item.status === s ? 'selected' : ''}>${s}</option>`
                 ).join('');
-
-                // 借用物標籤顯示時，依照最新的後台排序展示
                 let itemsHtml = "";
                 inventoryArray.forEach(invItem => {
                     const qty = item.items[invItem.name] || 0;
@@ -532,7 +607,6 @@
                         itemsHtml += `<span class="inline-flex items-center bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5 text-xs font-medium text-gray-700 mr-1 my-0.5 whitespace-nowrap">${invItem.name}<b class="ml-1 bg-slate-700 text-white px-1 rounded text-[10px]">${qty}</b></span>`;
                     }
                 });
-
                 let inlinePickupTimeBlock = "";
                 if (item.status === '待領取' && item.pickupTime) {
                     const parts = item.pickupTime.split('T');
@@ -542,20 +616,16 @@
                         <div class="mt-1.5 bg-amber-50 border border-amber-200/60 rounded px-2 py-1 text-[11px] text-amber-700 leading-tight">
                             <div class="font-bold flex items-center gap-0.5"><i class="fa-regular fa-clock"></i> 領取：</div>
                             <div>${formattedDate} ${formattedTime}</div>
-                        </div>
-                    `;
+                        </div>`;
                 }
-
                 let returnTimeHtml = "—";
                 if (item.returnTime) {
                     const d = item.returnTime.split('T');
                     returnTimeHtml = `<div class="font-medium text-gray-800">${d[0].replace(/-/g, '/')}</div><div class="text-xs text-gray-400">${d[1] || ''}</div>`;
                 }
-
-                let handlerOptions = `<option value="—" ${item.handler === '—' ? 'selected' : ''}>—</option>` + staffList.map(name => 
+                let handlerOptions = `<option value="—" ${item.handler === '—' ? 'selected' : ''}>—</option>` + staffList.map(name =>
                     `<option value="${name}" ${item.handler === name ? 'selected' : ''}>${name}</option>`
                 ).join('');
-
                 let actionButtonsHtml = "";
                 if (currentUser) {
                     actionButtonsHtml = `
@@ -564,23 +634,19 @@
                         </button>
                         <button onclick="handleCompleteLoan('${item.id}')" class="text-emerald-600 hover:text-emerald-800 p-1.5 rounded bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition" title="借用單結案">
                             <i class="fa-solid fa-square-check text-base"></i>
-                        </button>
-                    `;
+                        </button>`;
                     if (currentUser.role === 'admin') {
                         actionButtonsHtml += `
                             <button onclick="deleteLoan('${item.id}')" class="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition" title="刪除本單(僅限管理者)">
                                 <i class="fa-regular fa-trash-can text-base"></i>
-                            </button>
-                        `;
+                            </button>`;
                     }
                 } else {
                     actionButtonsHtml = `
                         <button onclick="openLoanModal('${item.id}')" class="text-blue-600 hover:text-blue-800 p-1.5 rounded bg-blue-50 border border-blue-100 transition" title="詳細檢視">
                             <i class="fa-regular fa-folder-open text-base"></i>
-                        </button>
-                    `;
+                        </button>`;
                 }
-
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50/80 transition-colors";
                 tr.innerHTML = `
@@ -615,55 +681,43 @@
                         <div class="flex items-center justify-center space-x-1">
                             ${actionButtonsHtml}
                         </div>
-                    </td>
-                `;
+                    </td>`;
                 tbody.appendChild(tr);
             });
         }
 
         function updateItemField(id, field, value) {
             const idx = loans.findIndex(l => l.id === id);
-            if(idx !== -1) {
+            if (idx !== -1) {
                 loans[idx][field] = value;
                 saveToStorage();
-                updateCounts();
-                renderLoanList();
-                renderInventory();
             }
         }
+        window.updateItemField = updateItemField;
 
         function handleCompleteLoan(id) {
             const idx = loans.findIndex(l => l.id === id);
-            if(idx !== -1) {
+            if (idx !== -1) {
                 const item = loans[idx];
-                if(confirm(`確定要將借用人 [${item.borrower}] 的此筆借用單辦理「借用單結案」嗎？`)) {
+                if (confirm(`確定要將借用人 [${item.borrower}] 的此筆借用單辦理「借用單結案」嗎？`)) {
                     const now = new Date();
                     const timeStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
                     const operator = currentUser ? currentUser.name : "系統人員";
-                    
                     loans[idx].status = "已歸還";
-                    
                     const stamp = `[由 ${operator} 於 ${timeStr} 執行借用單結案]`;
                     if (!loans[idx].notes.includes("執行借用單結案")) {
                         loans[idx].notes = loans[idx].notes ? `${loans[idx].notes} ${stamp}` : stamp;
                     }
-                    
                     saveToStorage();
-                    updateCounts();
-                    renderLoanList();
-                    renderInventory();
                 }
             }
         }
+        window.handleCompleteLoan = handleCompleteLoan;
 
-        // --- 現有庫存表格渲染（含自訂排序箭頭） ---
         function renderInventory() {
             const tbody = document.getElementById('inventory-table-body');
             tbody.innerHTML = "";
-
             const searchDate = document.getElementById('search-start-date').value;
-
-            // 依權限切換表頭「排序」及「刪除」行的欄位
             const thSort = document.querySelector('.id-sort-th');
             const thDelete = document.querySelector('.id-delete-th');
             if (currentUser) {
@@ -673,15 +727,11 @@
                 if (thSort) thSort.classList.add('hidden');
                 if (thDelete) thDelete.classList.add('hidden');
             }
-
             inventoryArray.forEach((item, index) => {
                 const currentAvailable = getAvailableQty(item.name, searchDate, searchDate);
-                
                 let qtyBadgeColor = "text-blue-600 font-bold bg-blue-50";
                 if (currentAvailable === 0) qtyBadgeColor = "text-red-600 font-bold bg-red-50";
                 else if (currentAvailable <= 2) qtyBadgeColor = "text-amber-600 font-bold bg-amber-50";
-
-                // 排序控制按鈕區
                 let sortControlHtml = "";
                 if (currentUser) {
                     sortControlHtml = `
@@ -694,25 +744,20 @@
                                     <i class="fa-solid fa-caret-down text-sm"></i>
                                 </button>
                             </div>
-                        </td>
-                    `;
+                        </td>`;
                 }
-
                 let quantityControlHtml = "";
                 if (currentUser) {
                     quantityControlHtml = `
                         <input type="number" value="${item.limit}" min="1" onchange="updateInventoryLimit('${item.name}', this.value)" class="w-16 bg-gray-50 border border-gray-200 rounded text-center py-0.5 text-xs focus:outline-none focus:border-blue-500" title="修改總上限限制">
-                        <span class="text-gray-500 text-xs">個</span>
-                    `;
+                        <span class="text-gray-500 text-xs">個</span>`;
                 } else {
                     quantityControlHtml = `<span class="text-gray-400 text-xs font-medium">/ 總數 ${item.limit} 個</span>`;
                 }
-
                 let deleteButtonHtml = "";
                 if (currentUser) {
                     deleteButtonHtml = `<td class="p-3 text-center"><button onclick="deleteInventoryItem('${item.name}')" class="text-gray-300 hover:text-red-500 text-sm p-1 transition" title="移除品項"><i class="fa-regular fa-trash-can"></i></button></td>`;
                 }
-
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-50 transition-colors";
                 tr.innerHTML = `
@@ -725,26 +770,20 @@
                             ${quantityControlHtml}
                         </div>
                     </td>
-                    ${deleteButtonHtml}
-                `;
+                    ${deleteButtonHtml}`;
                 tbody.appendChild(tr);
             });
         }
 
-        // 核心邏輯：動態變更後台順序
         function moveInventoryOrder(currentIndex, direction) {
             const targetIndex = currentIndex + direction;
             if (targetIndex < 0 || targetIndex >= inventoryArray.length) return;
-
-            // 交換陣列內兩物品位置
             const temp = inventoryArray[currentIndex];
             inventoryArray[currentIndex] = inventoryArray[targetIndex];
             inventoryArray[targetIndex] = temp;
-
             saveToStorage();
-            renderInventory();
-            renderLoanList(); // 更新清單欄位排序
         }
+        window.moveInventoryOrder = moveInventoryOrder;
 
         function updateInventoryLimit(name, value) {
             const val = parseInt(value) || 1;
@@ -752,57 +791,49 @@
             if (target) {
                 target.limit = val;
                 saveToStorage();
-                renderLoanList();
-                renderInventory();
             }
         }
+        window.updateInventoryLimit = updateInventoryLimit;
 
         function addInventoryItem() {
             const inputName = document.getElementById('new-item-name');
             const inputTotal = document.getElementById('new-item-total');
             const name = inputName.value.trim();
             const total = parseInt(inputTotal.value) || 10;
-
-            if(!name) return;
-            if(inventoryArray.some(i => i.name === name)) {
+            if (!name) return;
+            if (inventoryArray.some(i => i.name === name)) {
                 alert("該物品名稱已存在於庫存清單中！");
                 return;
             }
-
             inventoryArray.push({ name: name, limit: total });
             saveToStorage();
-            renderInventory();
             inputName.value = "";
             inputTotal.value = "10";
         }
+        window.addInventoryItem = addInventoryItem;
 
         function deleteInventoryItem(name) {
-            if(confirm(`確定要將庫存物品「${name}」完全移出品項清單嗎？`)) {
+            if (confirm(`確定要將庫存物品「${name}」完全移出品項清單嗎？`)) {
                 inventoryArray = inventoryArray.filter(i => i.name !== name);
                 saveToStorage();
-                renderInventory();
             }
         }
+        window.deleteInventoryItem = deleteInventoryItem;
 
-        // --- 彈窗內快速修改借用物 ---
         let activeInlineLoanId = null;
         function openInlineItemsModal(id) {
             activeInlineLoanId = id;
             const item = loans.find(l => l.id === id);
             if (!item) return;
-
             const targetDate = item.useDate;
             document.getElementById('inline-qty-calc-tip').innerHTML = `<i class="fa-solid fa-clock mr-1"></i>當前計算基準：依據此單使用日期 <b>${targetDate}</b> 演算剩餘可用庫存。`;
-
             const container = document.getElementById('inline-items-container');
             container.innerHTML = "";
-
             inventoryArray.forEach(invItem => {
                 const currentQty = item.items[invItem.name] || 0;
                 const isChecked = currentQty > 0;
                 const avail = getAvailableQty(invItem.name, targetDate, targetDate, id);
                 const disabledAttr = currentUser ? "" : "disabled";
-
                 const div = document.createElement('div');
                 div.className = "flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100/70 transition";
                 div.innerHTML = `
@@ -815,11 +846,9 @@
                     </label>
                     <div class="flex items-center space-x-1 ${isChecked ? '' : 'opacity-30 pointer-events-none'}" id="inline-qty-box-${invItem.name}">
                         <input type="number" id="inline-num-${invItem.name}" value="${currentQty || 1}" ${disabledAttr} min="1" max="${avail + currentQty}" class="w-16 bg-white border border-gray-300 rounded px-1.5 py-0.5 text-center text-sm focus:outline-none">
-                    </div>
-                `;
+                    </div>`;
                 container.appendChild(div);
             });
-
             const btnSave = document.getElementById('btn-save-inline-items');
             if (currentUser) {
                 btnSave.onclick = saveInlineItems;
@@ -827,18 +856,19 @@
             } else {
                 btnSave.classList.add('hidden');
             }
-
             const m = document.getElementById('items-edit-modal');
             m.classList.remove('hidden');
             setTimeout(() => { m.classList.remove('opacity-0'); m.firstElementChild.classList.remove('scale-95'); }, 50);
         }
+        window.openInlineItemsModal = openInlineItemsModal;
 
         function toggleInlineQtyInput(name) {
             const chk = document.getElementById(`inline-chk-${name}`);
             const box = document.getElementById(`inline-qty-box-${name}`);
-            if(chk && chk.checked) box.classList.remove('opacity-30', 'pointer-events-none');
+            if (chk && chk.checked) box.classList.remove('opacity-30', 'pointer-events-none');
             else box.classList.add('opacity-30', 'pointer-events-none');
         }
+        window.toggleInlineQtyInput = toggleInlineQtyInput;
 
         function closeItemsModal() {
             const m = document.getElementById('items-edit-modal');
@@ -846,22 +876,20 @@
             m.firstElementChild.classList.add('scale-95');
             setTimeout(() => m.classList.add('hidden'), 200);
         }
+        window.closeItemsModal = closeItemsModal;
 
         function saveInlineItems() {
-            if(!activeInlineLoanId) return;
+            if (!activeInlineLoanId) return;
             const idx = loans.findIndex(l => l.id === activeInlineLoanId);
-            if(idx === -1) return;
-
+            if (idx === -1) return;
             const updatedItems = {};
             let isOverLimit = false;
-
             inventoryArray.forEach(invItem => {
                 const chk = document.getElementById(`inline-chk-${invItem.name}`);
-                if(chk && chk.checked) {
+                if (chk && chk.checked) {
                     const qty = parseInt(document.getElementById(`inline-num-${invItem.name}`).value) || 1;
                     const originalQty = loans[idx].items[invItem.name] || 0;
                     const maxAvail = getAvailableQty(invItem.name, loans[idx].useDate, loans[idx].useDate, activeInlineLoanId) + originalQty;
-                    
                     if (qty > maxAvail) {
                         alert(`「${invItem.name}」要求的數量 (${qty}) 超過了最大可用量 (${maxAvail})！`);
                         isOverLimit = true;
@@ -869,37 +897,30 @@
                     updatedItems[invItem.name] = qty;
                 }
             });
-
             if (isOverLimit) return;
-
             loans[idx].items = updatedItems;
             saveToStorage();
-            renderLoanList();
-            renderInventory();
             closeItemsModal();
         }
 
-        // --- 新增 / 完整編輯表單彈窗邏輯 ---
         function openLoanModal(id = null) {
             const m = document.getElementById('loan-modal');
             const title = document.getElementById('loan-modal-title');
             buildLocationDropdown();
-
             const inputs = m.querySelectorAll('input, select, textarea');
             inputs.forEach(el => {
-                if(currentUser) el.removeAttribute('disabled');
+                if (currentUser) el.removeAttribute('disabled');
                 else el.setAttribute('disabled', 'true');
             });
-
             const saveBtn = m.querySelector('button[onclick="saveLoanForm()"]');
-            if(currentUser) saveBtn.classList.remove('hidden');
+            if (currentUser) saveBtn.classList.remove('hidden');
             else saveBtn.classList.add('hidden');
-
             if (id) {
                 const item = loans.find(l => l.id === id);
                 if (!item) return;
-                
-                title.innerHTML = currentUser ? `<i class="fa-regular fa-pen-to-square mr-1.5 text-blue-400"></i>編輯借用單 (${id})` : `<i class="fa-regular fa-folder-open mr-1.5 text-blue-400"></i>檢視借用單資料 (${id})`;
+                title.innerHTML = currentUser
+                    ? `<i class="fa-regular fa-pen-to-square mr-1.5 text-blue-400"></i>編輯借用單 (${id})`
+                    : `<i class="fa-regular fa-folder-open mr-1.5 text-blue-400"></i>檢視借用單資料 (${id})`;
                 document.getElementById('form-loan-id').value = item.id;
                 document.getElementById('form-borrower').value = item.borrower;
                 document.getElementById('form-dept').value = item.dept;
@@ -909,7 +930,6 @@
                 document.getElementById('form-pickup-time').value = item.pickupTime || "";
                 document.getElementById('form-return-time').value = item.returnTime || "";
                 document.getElementById('form-notes').value = item.notes;
-
                 const selectLoc = document.getElementById('form-location');
                 const customInput = document.getElementById('form-location-custom');
                 if (LOCATION_OPTIONS.includes(item.location) && item.location !== '其他') {
@@ -918,7 +938,7 @@
                     customInput.value = "";
                 } else {
                     selectLoc.value = "其他";
-                    if(currentUser) customInput.classList.remove('hidden');
+                    if (currentUser) customInput.classList.remove('hidden');
                     customInput.value = item.location;
                 }
             } else {
@@ -927,7 +947,6 @@
                 document.getElementById('form-borrower').value = "";
                 document.getElementById('form-dept').value = "";
                 document.getElementById('form-phone').value = "";
-                
                 const searchStart = document.getElementById('search-start-date').value;
                 document.getElementById('form-use-date').value = searchStart || new Date().toISOString().split('T')[0];
                 document.getElementById('form-period').value = "";
@@ -938,34 +957,27 @@
                 document.getElementById('form-location-custom').classList.add('hidden');
                 document.getElementById('form-location-custom').value = "";
             }
-
             refreshFormAvailableQty();
-
             m.classList.remove('hidden');
             setTimeout(() => { m.classList.remove('opacity-0'); m.firstElementChild.classList.remove('scale-95'); }, 50);
         }
+        window.openLoanModal = openLoanModal;
 
         function refreshFormAvailableQty() {
             const itemsContainer = document.getElementById('form-items-container');
             itemsContainer.innerHTML = "";
-
             const id = document.getElementById('form-loan-id').value;
             const useDate = document.getElementById('form-use-date').value;
-            
             const calcTip = document.getElementById('form-qty-calc-tip');
             if (useDate) calcTip.innerHTML = `（依據 <b>${useDate}</b> 演算當前可用餘額）`;
             else calcTip.innerHTML = `（請先填寫上方使用日期）`;
-
             const currentLoanItemMap = id ? (loans.find(l => l.id === id)?.items || {}) : {};
             const disabledAttr = currentUser ? "" : "disabled";
-
             inventoryArray.forEach(invItem => {
                 const originalQty = currentLoanItemMap[invItem.name] || 0;
                 const isChecked = originalQty > 0;
-                
                 const avail = getAvailableQty(invItem.name, useDate, useDate, id ? id : null);
                 const maxAllowed = avail + originalQty;
-
                 const div = document.createElement('div');
                 div.className = "flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-200 text-xs";
                 div.innerHTML = `
@@ -978,18 +990,19 @@
                     </label>
                     <div class="flex items-center space-x-1 ${isChecked ? '' : 'opacity-30 pointer-events-none'}" id="form-qty-box-${invItem.name}">
                         <input type="number" id="form-num-${invItem.name}" value="${originalQty || 1}" ${disabledAttr} min="1" max="${maxAllowed}" class="w-12 bg-white border border-gray-300 rounded text-center py-0.5 text-xs focus:outline-none">
-                    </div>
-                `;
+                    </div>`;
                 itemsContainer.appendChild(div);
             });
         }
+        window.refreshFormAvailableQty = refreshFormAvailableQty;
 
         function toggleFormQtyInput(name) {
             const chk = document.getElementById(`form-chk-${name}`);
             const box = document.getElementById(`form-qty-box-${name}`);
-            if(chk && chk.checked) box.classList.remove('opacity-30', 'pointer-events-none');
+            if (chk && chk.checked) box.classList.remove('opacity-30', 'pointer-events-none');
             else box.classList.add('opacity-30', 'pointer-events-none');
         }
+        window.toggleFormQtyInput = toggleFormQtyInput;
 
         function closeLoanModal() {
             const m = document.getElementById('loan-modal');
@@ -997,6 +1010,7 @@
             m.firstElementChild.classList.add('scale-95');
             setTimeout(() => m.classList.add('hidden'), 200);
         }
+        window.closeLoanModal = closeLoanModal;
 
         function saveLoanForm() {
             const id = document.getElementById('form-loan-id').value;
@@ -1008,29 +1022,24 @@
             const pickupTime = document.getElementById('form-pickup-time').value;
             const returnTime = document.getElementById('form-return-time').value;
             const notes = document.getElementById('form-notes').value.trim();
-
             const selectLoc = document.getElementById('form-location').value;
             let finalLocation = selectLoc;
             if (selectLoc === '其他') {
                 finalLocation = document.getElementById('form-location-custom').value.trim();
                 if (!finalLocation) finalLocation = "其他自訂地點";
             }
-
             if (!borrower || !dept || !phone || !useDate || !period || !finalLocation || !pickupTime || !returnTime) {
                 alert("請完整填寫所有必填欄位 (*)");
                 return;
             }
-
             const selectedItems = {};
             let isOverLimit = false;
-
             inventoryArray.forEach(invItem => {
-                const chk = document.getElementById('form-chk-'+invItem.name);
+                const chk = document.getElementById('form-chk-' + invItem.name);
                 if (chk && chk.checked) {
-                    const qty = parseInt(document.getElementById('form-num-'+invItem.name).value) || 1;
+                    const qty = parseInt(document.getElementById('form-num-' + invItem.name).value) || 1;
                     const originalQty = id ? ((loans.find(l => l.id === id)?.items || {})[invItem.name] || 0) : 0;
                     const maxAllowed = getAvailableQty(invItem.name, useDate, useDate, id ? id : null) + originalQty;
-
                     if (qty > maxAllowed) {
                         alert(`「${invItem.name}」數量超過可用餘額！`);
                         isOverLimit = true;
@@ -1038,14 +1047,11 @@
                     selectedItems[invItem.name] = qty;
                 }
             });
-
             if (isOverLimit) return;
-
             if (Object.keys(selectedItems).length === 0) {
                 alert("請至少選擇一項借用物品！");
                 return;
             }
-
             if (id) {
                 const idx = loans.findIndex(l => l.id === id);
                 if (idx !== -1) {
@@ -1053,7 +1059,7 @@
                 }
             } else {
                 const automaticHandler = currentUser ? currentUser.name : "—";
-                const newId = "L" + String(loans.length + 1).padStart(3, '0') + String(Math.floor(Math.random()*10));
+                const newId = "L" + String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 10));
                 const newLoan = {
                     id: newId, status: "待領取",
                     borrower, dept, phone, useDate, period, location: finalLocation, pickupTime, returnTime, notes,
@@ -1061,23 +1067,31 @@
                 };
                 loans.unshift(newLoan);
             }
-
             saveToStorage();
-            updateCounts();
-            renderLoanList();
-            renderInventory();
             closeLoanModal();
         }
+        window.saveLoanForm = saveLoanForm;
 
         function deleteLoan(id) {
-            if(confirm(`確定要完全刪除單號 [${id}] 的借用紀錄嗎？(本操作不可還原)`)) {
+            if (confirm(`確定要完全刪除單號 [${id}] 的借用紀錄嗎？(本操作不可還原)`)) {
                 loans = loans.filter(l => l.id !== id);
                 saveToStorage();
-                updateCounts();
-                renderLoanList();
-                renderInventory();
             }
         }
+        window.deleteLoan = deleteLoan;
+
+        // ---- 頁面初始化 ----
+        window.onload = function () {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            document.getElementById('current-date').innerText = todayStr.replace(/-/g, '/');
+            document.getElementById('search-start-date').value = todayStr;
+            updateLoginStatusUI();
+            buildLocationDropdown();
+            refreshToolbarLayout();
+            initFirebase();
+        };
+
     </script>
 </body>
 </html>
