@@ -971,13 +971,14 @@
             const m = document.getElementById('loan-modal');
             const title = document.getElementById('loan-modal-title');
             buildLocationDropdown();
+            const isNewLoan = !id;
             const inputs = m.querySelectorAll('input, select, textarea');
             inputs.forEach(el => {
-                if (currentUser) el.removeAttribute('disabled');
+                if (isNewLoan || currentUser) el.removeAttribute('disabled');
                 else el.setAttribute('disabled', 'true');
             });
             const saveBtn = m.querySelector('button[onclick="saveLoanForm()"]');
-            if (currentUser) saveBtn.classList.remove('hidden');
+            if (isNewLoan || currentUser) saveBtn.classList.remove('hidden');
             else saveBtn.classList.add('hidden');
             if (id) {
                 const item = loans.find(l => l.id === id);
@@ -1038,7 +1039,8 @@
             if (useDate) calcTip.innerHTML = `（依據 <b>${useDate}</b> 演算當前可用餘額）`;
             else calcTip.innerHTML = `（請先填寫上方使用日期）`;
             const currentLoanItemMap = id ? (loans.find(l => l.id === id)?.items || {}) : {};
-            const disabledAttr = currentUser ? "" : "disabled";
+            const editingId = document.getElementById('form-loan-id').value;
+            const disabledAttr = (!editingId || currentUser) ? "" : "disabled";
             inventoryArray.forEach(invItem => {
                 const originalQty = currentLoanItemMap[invItem.name] || 0;
                 const isChecked = originalQty > 0;
