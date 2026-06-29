@@ -1323,8 +1323,8 @@
                         </button>`;
                 }
                 const tr = document.createElement('tr');
-                const markBg = item.markColor ? `background:${item.markColor};` : '';
-                tr.style.cssText = item.markColor ? `background-color:${item.markColor}` : '';
+                const isReturned = item.status === '已歸還';
+                tr.style.cssText = isReturned ? 'background-color:#f3f4f6' : (item.markColor ? `background-color:${item.markColor}` : '');
                 tr.className = "transition-colors";
                 tr.innerHTML = `
                     <td class="p-4 w-10 text-center" id="th-checkbox-cell">
@@ -1355,6 +1355,7 @@
                         <select onchange="updateItemField('${item.id}', 'handler', this.value)" class="w-full text-xs bg-gray-50 border border-gray-200 rounded p-1 focus:outline-none focus:border-blue-500">
                             ${handlerOptions}
                         </select>
+                        ${item.closeDate ? `<div class="mt-1 text-[11px] text-gray-400"><i class="fa-solid fa-check mr-0.5"></i>結案：${item.closeDate}</div>` : ''}
                     </td>
                     <td class="p-4 text-xs text-gray-400 max-w-xs truncate" title="${item.notes || ''}">${item.notes || '—'}</td>
                     <td class="p-4 text-center">
@@ -1388,12 +1389,13 @@
                 const item = loans[idx];
                 if (confirm(`確定要將借用人 [${item.borrower}] 的此筆借用單辦理「借用單結案」嗎？`)) {
                     const now = new Date();
-                    const timeStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                    const operator = currentUser ? currentUser.name : "系統人員";
+                    const pad = n => String(n).padStart(2,'0');
+                    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
                     loans[idx].status = "已歸還";
-                    const stamp = `[由 ${operator} 於 ${timeStr} 執行借用單結案]`;
-                    if (!loans[idx].notes.includes("執行借用單結案")) {
-                        loans[idx].notes = loans[idx].notes ? `${loans[idx].notes} ${stamp}` : stamp;
+                    loans[idx].closeDate = dateStr;
+                    // Clean up any old stamp from notes
+                    if (loans[idx].notes) {
+                        loans[idx].notes = loans[idx].notes.replace(/\s*\[由.*?執行借用單結案\]/g, '').trim();
                     }
                     saveToStorage();
                 }
