@@ -44,6 +44,7 @@
         <div class="bg-white rounded-xl shadow-sm p-2 flex border border-gray-100 max-w-md">
             <button onclick="switchTab('loan-list')" id="tab-loan-list" class="flex-1 py-2 text-center font-bold rounded-lg transition text-blue-600 bg-blue-50 text-sm">借用清單</button>
             <button onclick="switchTab('inventory')" id="tab-inventory" class="flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm">現有庫存狀態</button>
+            <button onclick="switchTab('dept-mgmt')" id="tab-dept-mgmt" class="flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm">管理單位清單</button>
         </div>
 
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4">
@@ -128,6 +129,39 @@
                             </tr>
                         </thead>
                         <tbody id="inventory-table-body" class="text-sm divide-y divide-gray-100 text-gray-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-dept-mgmt" class="hidden space-y-4 max-w-xl">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="font-bold text-sm text-gray-700"><i class="fa-solid fa-building mr-2 text-blue-500"></i>單位清單管理</h2>
+                    <span id="dept-count-badge" class="text-xs text-gray-400"></span>
+                </div>
+                <div id="dept-mgmt-login-notice" class="p-5 text-sm text-amber-700 bg-amber-50 border-b border-amber-100 hidden">
+                    <i class="fa-solid fa-lock mr-1"></i>請先登入才能新增或刪除單位。
+                </div>
+                <div id="dept-add-row" class="p-4 border-b border-gray-100 hidden">
+                    <div class="flex gap-2">
+                        <input type="text" id="new-dept-code" placeholder="代碼（如 7760）" maxlength="8" class="w-32 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 font-mono">
+                        <input type="text" id="new-dept-name" placeholder="單位名稱（如 麻醉部）" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <button onclick="addDeptItem()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition shadow-sm whitespace-nowrap">
+                            <i class="fa-solid fa-plus mr-1"></i>新增
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-y-auto max-h-[60vh]">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs font-medium">
+                                <th class="px-4 py-2 w-24">代碼</th>
+                                <th class="px-4 py-2">單位名稱</th>
+                                <th class="px-4 py-2 w-16 text-center" id="dept-del-th">刪除</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dept-mgmt-table-body" class="text-sm divide-y divide-gray-100 text-gray-700"></tbody>
                     </table>
                 </div>
             </div>
@@ -275,7 +309,7 @@
         const db = getDatabase(app);
 
 
-        const DEPT_LIST = [
+        let DEPT_LIST = [
             "7680_醫學美容中心","7691_社區發展組","7710_兒科部","7718_新生兒科",
             "771E_兒童感染科","771F_兒童心臟科","771G_兒童遺傳科","771M_兒童急重症科",
             "771N_兒童神經科","7720_婦產部","7724_婦科","7725_生殖醫學科",
@@ -380,6 +414,12 @@
         async function initFirebase() {
             try {
                 // 初始化庫存（若 Firebase 無資料，寫入預設值）
+                // Init depts
+                const deptSnap = await get(ref(db, 'depts'));
+                if (!deptSnap.exists()) {
+                    await set(ref(db, 'depts'), DEPT_LIST);
+                }
+
                 const invSnap = await get(ref(db, 'inventory'));
                 if (!invSnap.exists()) {
                     await set(ref(db, 'inventory'), defaultInventoryArray);
@@ -425,6 +465,80 @@
                     renderInventory();
                     updateCounts();
                 });
+
+
+        // ---- 即時監聽 depts（單位清單）----
+        onValue(ref(db, 'depts'), (snap) => {
+            if (snap.exists()) {
+                const raw = snap.val();
+                // raw is array or object
+                const arr = Array.isArray(raw) ? raw : Object.values(raw);
+                DEPT_LIST = arr.filter(Boolean);
+            }
+            // re-render dept mgmt if visible
+            if (activeTab === 'dept-mgmt') renderDeptMgmt();
+        });
+
+        async function saveDepts() {
+            await set(ref(db, 'depts'), DEPT_LIST);
+        }
+
+        function renderDeptMgmt() {
+            const tbody = document.getElementById('dept-mgmt-table-body');
+            const badge = document.getElementById('dept-count-badge');
+            const notice = document.getElementById('dept-mgmt-login-notice');
+            const addRow = document.getElementById('dept-add-row');
+            const delTh = document.getElementById('dept-del-th');
+            if (!tbody) return;
+            if (currentUser) {
+                notice.classList.add('hidden');
+                addRow.classList.remove('hidden');
+                if (delTh) delTh.classList.remove('hidden');
+            } else {
+                notice.classList.remove('hidden');
+                addRow.classList.add('hidden');
+                if (delTh) delTh.classList.add('hidden');
+            }
+            badge.innerText = `共 ${DEPT_LIST.length} 個單位`;
+            tbody.innerHTML = '';
+            DEPT_LIST.forEach((d, i) => {
+                const parts = d.split('_');
+                const code = parts[0] || '';
+                const name = parts.slice(1).join('_') || '';
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-4 py-2 font-mono text-xs text-gray-400">${code}</td>
+                    <td class="px-4 py-2 font-medium text-gray-800">${name}</td>
+                    <td class="px-4 py-2 text-center">${currentUser ? `<button onclick="deleteDeptItem(${i})" class="text-gray-300 hover:text-red-500 text-sm p-1 transition" title="刪除"><i class="fa-regular fa-trash-can"></i></button>` : ''}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        window.renderDeptMgmt = renderDeptMgmt;
+
+        function addDeptItem() {
+            const code = document.getElementById('new-dept-code').value.trim().toUpperCase();
+            const name = document.getElementById('new-dept-name').value.trim();
+            if (!code || !name) { alert('請填寫代碼與單位名稱'); return; }
+            const entry = code + '_' + name;
+            if (DEPT_LIST.includes(entry)) { alert('此單位已存在'); return; }
+            DEPT_LIST.push(entry);
+            DEPT_LIST.sort();
+            saveDepts();
+            document.getElementById('new-dept-code').value = '';
+            document.getElementById('new-dept-name').value = '';
+            renderDeptMgmt();
+        }
+        window.addDeptItem = addDeptItem;
+
+        function deleteDeptItem(index) {
+            const d = DEPT_LIST[index];
+            if (!confirm(`確定要刪除「${d}」嗎？`)) return;
+            DEPT_LIST.splice(index, 1);
+            saveDepts();
+            renderDeptMgmt();
+        }
+        window.deleteDeptItem = deleteDeptItem;
 
                 document.getElementById('loading-overlay').style.display = 'none';
             } catch (e) {
@@ -504,22 +618,17 @@
 
         function switchTab(tab) {
             activeTab = tab;
-            const btnList = document.getElementById('tab-loan-list');
-            const btnInv = document.getElementById('tab-inventory');
-            const panelList = document.getElementById('panel-loan-list');
-            const panelInv = document.getElementById('panel-inventory');
-            if (tab === 'loan-list') {
-                btnList.className = "flex-1 py-2 text-center font-bold rounded-lg transition text-blue-600 bg-blue-50 text-sm";
-                btnInv.className = "flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm";
-                panelList.classList.remove('hidden');
-                panelInv.classList.add('hidden');
-            } else {
-                btnInv.className = "flex-1 py-2 text-center font-bold rounded-lg transition text-blue-600 bg-blue-50 text-sm";
-                btnList.className = "flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm";
-                panelInv.classList.remove('hidden');
-                panelList.classList.add('hidden');
-                renderInventory();
-            }
+            const tabs = ['loan-list', 'inventory', 'dept-mgmt'];
+            const activeClass = "flex-1 py-2 text-center font-bold rounded-lg transition text-blue-600 bg-blue-50 text-sm";
+            const inactiveClass = "flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm";
+            tabs.forEach(t => {
+                const btn = document.getElementById('tab-' + t);
+                const panel = document.getElementById('panel-' + t);
+                if (btn) btn.className = t === tab ? activeClass : inactiveClass;
+                if (panel) panel.classList.toggle('hidden', t !== tab);
+            });
+            if (tab === 'inventory') renderInventory();
+            if (tab === 'dept-mgmt') renderDeptMgmt();
             refreshToolbarLayout();
         }
         window.switchTab = switchTab;
@@ -528,14 +637,22 @@
             const label = document.getElementById('date-search-label');
             const tip = document.getElementById('search-tip');
             const filterGroup = document.getElementById('status-filter-group');
+            const toolbar = document.getElementById('toolbar-action-area');
             if (activeTab === 'loan-list') {
                 label.innerHTML = `<i class="fa-solid fa-filter mr-1 text-blue-500"></i> 使用日期查詢：`;
                 tip.classList.add('hidden');
                 filterGroup.classList.remove('opacity-40', 'pointer-events-none');
-            } else {
+                toolbar.classList.remove('hidden');
+            } else if (activeTab === 'inventory') {
                 label.innerHTML = `<i class="fa-regular fa-calendar-days mr-1 text-blue-500"></i> 日期庫存查詢：`;
                 tip.classList.remove('hidden');
                 filterGroup.classList.add('opacity-40', 'pointer-events-none');
+                toolbar.classList.remove('hidden');
+            } else {
+                label.innerHTML = `<i class="fa-regular fa-calendar-days mr-1 text-blue-500"></i> 日期庫存查詢：`;
+                tip.classList.add('hidden');
+                filterGroup.classList.add('opacity-40', 'pointer-events-none');
+                toolbar.classList.add('hidden');
             }
         }
 
@@ -584,6 +701,7 @@
                 closeLoginModal();
                 renderLoanList();
                 renderInventory();
+                if (activeTab === 'dept-mgmt') renderDeptMgmt();
             } else {
                 document.getElementById('login-error').classList.remove('hidden');
             }
@@ -596,6 +714,7 @@
             updateLoginStatusUI();
             renderLoanList();
             renderInventory();
+            if (activeTab === 'dept-mgmt') renderDeptMgmt();
         }
         window.handleLogout = handleLogout;
 
