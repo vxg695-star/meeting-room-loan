@@ -1272,8 +1272,10 @@
                 return;
             }
             filtered.forEach(item => {
+                const now = Date.now();
+                const isOverdue = item.status === '借用中' && item.returnTime && new Date(item.returnTime).getTime() < now;
                 let statusBg = "bg-yellow-50 text-yellow-700 border-yellow-200";
-                if (item.status === '借用中') statusBg = "bg-blue-50 text-blue-700 border-blue-200";
+                if (item.status === '借用中') statusBg = isOverdue ? "bg-red-100 text-red-700 border-red-300" : "bg-blue-50 text-blue-700 border-blue-200";
                 if (item.status === '已歸還') statusBg = "bg-emerald-50 text-emerald-700 border-emerald-200";
                 let statusOptions = ['待領取', '借用中', '已歸還'].map(s =>
                     `<option value="${s}" ${item.status === s ? 'selected' : ''}>${s}</option>`
@@ -1337,6 +1339,7 @@
                         <select onchange="updateItemField('${item.id}', 'status', this.value)" class="text-xs font-bold border rounded px-1.5 py-1 ${statusBg} focus:outline-none cursor-pointer w-full text-center">
                             ${statusOptions}
                         </select>
+                        ${isOverdue ? '<div class="mt-1 text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-center"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>逾期未還</div>' : ''}
                         ${inlinePickupTimeBlock}
                     </td>
                     <td class="p-4 font-bold text-gray-900">${item.borrower}</td>
