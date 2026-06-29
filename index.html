@@ -204,10 +204,11 @@
                 </div>
                 <div class="col-span-2">
                     <label class="block text-xs font-bold text-gray-500 mb-1">使用時段 <span class="text-red-500">*</span></label>
-                    <div class="flex items-center gap-2">
-                        <input type="datetime-local" id="form-use-date" onchange="refreshFormAvailableQty(); syncPickupFromUseDate()" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <input type="date" id="form-use-date" onchange="refreshFormAvailableQty(); syncPickupFromUseDate()" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <input type="time" id="form-time-start" onchange="syncPickupFromUseDate()" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
                         <span class="text-gray-400 text-sm font-medium">～</span>
-                        <input type="datetime-local" id="form-period" onchange="refreshFormAvailableQty()" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <input type="time" id="form-period" onchange="refreshFormAvailableQty()" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
                     </div>
                 </div>
                 <div class="col-span-1">
@@ -1325,7 +1326,7 @@
                     <td class="p-4 text-gray-500">${item.phone}</td>
                     <td class="p-4">
                         <div class="font-medium text-gray-900 whitespace-nowrap">${item.useDate}</div>
-                        <div class="text-xs text-blue-600 font-medium">${item.period}</div>
+                        <div class="text-xs text-blue-600 font-medium">${formatPeriod(item.period)}</div>
                     </td>
                     <td class="p-4 text-gray-800 font-medium">${item.location}</td>
                     <td class="p-4 cursor-pointer hover:bg-blue-50/40 rounded transition group" onclick="openInlineItemsModal('${item.id}')" title="點擊快速修改借用物品">
@@ -1597,8 +1598,11 @@
                 document.getElementById('form-borrower').value = item.borrower;
                 document.getElementById('form-dept').value = item.dept;
                 document.getElementById('form-phone').value = item.phone;
-                document.getElementById('form-use-date').value = item.useDate && item.useDate.length === 10 ? item.useDate + 'T00:00' : (item.useDate || '');
-                document.getElementById('form-period').value = item.period && item.period.includes('T') ? item.period : '';
+                document.getElementById('form-use-date').value = item.useDate || '';
+                // period stored as "HH:MM ～ HH:MM" or legacy text
+                const periodParts = item.period ? item.period.split(' ～ ') : [];
+                document.getElementById('form-time-start').value = periodParts[0] && periodParts[0].match(/^\d{2}:\d{2}$/) ? periodParts[0] : '';
+                document.getElementById('form-period').value = periodParts[1] && periodParts[1].match(/^\d{2}:\d{2}$/) ? periodParts[1] : '';
                 document.getElementById('form-pickup-time').value = item.pickupTime || "";
                 document.getElementById('form-return-time').value = item.returnTime || "";
                 document.getElementById('form-notes').value = item.notes;
@@ -1620,11 +1624,12 @@
                 document.getElementById('form-dept').value = "";
                 document.getElementById('form-phone').value = "";
                 const searchStart = document.getElementById('search-start-date').value;
-                const todayDT = new Date().toISOString().slice(0,16);
-                document.getElementById('form-use-date').value = searchStart ? searchStart + 'T09:00' : todayDT;
-                document.getElementById('form-period').value = searchStart ? searchStart + 'T18:00' : '';
-                document.getElementById('form-pickup-time').value = searchStart ? searchStart + 'T09:00' : todayDT;
-                document.getElementById('form-return-time').value = searchStart ? searchStart + 'T18:00' : '';
+                const todayStr = new Date().toISOString().split('T')[0];
+                document.getElementById('form-use-date').value = searchStart || todayStr;
+                document.getElementById('form-time-start').value = '09:00';
+                document.getElementById('form-period').value = '18:00';
+                document.getElementById('form-pickup-time').value = (searchStart || todayStr) + 'T09:00';
+                document.getElementById('form-return-time').value = (searchStart || todayStr) + 'T18:00';
                 document.getElementById('form-notes').value = "";
                 document.getElementById('form-location').value = LOCATION_OPTIONS[0];
                 document.getElementById('form-location-custom').classList.add('hidden');
@@ -1640,8 +1645,7 @@
             const itemsContainer = document.getElementById('form-items-container');
             itemsContainer.innerHTML = "";
             const id = document.getElementById('form-loan-id').value;
-            const useDateRaw = document.getElementById('form-use-date').value;
-            const useDate = useDateRaw ? useDateRaw.split('T')[0] : '';
+            const useDate = document.getElementById('form-use-date').value || '';
             const calcTip = document.getElementById('form-qty-calc-tip');
             if (useDate) calcTip.innerHTML = `（依據 <b>${useDate}</b> 演算當前可用餘額）`;
             else calcTip.innerHTML = `（請先填寫上方使用日期）`;
@@ -1672,16 +1676,25 @@
         window.refreshFormAvailableQty = refreshFormAvailableQty;
 
         function syncPickupFromUseDate() {
-            const udt = document.getElementById('form-use-date').value;
-            if (!udt) return;
-            const dateOnly = udt.split('T')[0];
+            const dateOnly = document.getElementById('form-use-date').value;
+            const timeStart = document.getElementById('form-time-start').value || '09:00';
+            if (!dateOnly) return;
             if (!document.getElementById('form-pickup-time').value)
-                document.getElementById('form-pickup-time').value = udt;
+                document.getElementById('form-pickup-time').value = dateOnly + 'T' + timeStart;
             if (!document.getElementById('form-return-time').value)
                 document.getElementById('form-return-time').value = dateOnly + 'T18:00';
             if (!document.getElementById('form-period').value)
-                document.getElementById('form-period').value = dateOnly + 'T18:00';
+                document.getElementById('form-period').value = '18:00';
         }
+        function formatPeriod(period) {
+            if (!period) return '';
+            // Already clean "HH:MM ～ HH:MM"
+            if (/^\d{2}:\d{2} ～ \d{2}:\d{2}$/.test(period)) return period;
+            // Legacy "YYYY-MM-DDTHH:MM ～ YYYY-MM-DDTHH:MM"
+            return period.replace(/(\d{4}-\d{2}-\d{2}T)/g, '').replace(/~/g, '～');
+        }
+        window.formatPeriod = formatPeriod;
+
         window.syncPickupFromUseDate = syncPickupFromUseDate;
 
 
@@ -1707,9 +1720,10 @@
             const borrower = document.getElementById('form-borrower').value.trim();
             const dept = document.getElementById('form-dept').value.trim();
             const phone = document.getElementById('form-phone').value.trim();
-            const useDateRaw = document.getElementById('form-use-date').value;
-            const useDate = useDateRaw ? useDateRaw.split('T')[0] : '';
-            const period = document.getElementById('form-use-date').value + ' ～ ' + document.getElementById('form-period').value;
+            const useDate = document.getElementById('form-use-date').value || '';
+            const timeStart = document.getElementById('form-time-start').value || '';
+            const timeEnd = document.getElementById('form-period').value || '';
+            const period = timeStart && timeEnd ? timeStart + ' ～ ' + timeEnd : (timeStart || timeEnd || '');
             const pickupTime = document.getElementById('form-pickup-time').value;
             const returnTime = document.getElementById('form-return-time').value;
             const notes = document.getElementById('form-notes').value.trim();
