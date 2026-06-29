@@ -219,7 +219,12 @@
                 </div>
                 <div class="col-span-1">
                     <label class="block text-xs font-bold text-gray-500 mb-1">領取日期時間 <span class="text-red-500">*</span></label>
-                    <input type="datetime-local" id="form-pickup-time" onchange="refreshFormAvailableQty()" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    <div class="flex gap-2 items-center">
+                        <input type="datetime-local" id="form-pickup-time" onchange="refreshFormAvailableQty()" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <button type="button" onclick="setPickupNow()" class="shrink-0 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium px-2.5 py-2 rounded-lg transition flex items-center gap-1 shadow-sm" title="填入現在時間">
+                            <i class="fa-regular fa-clock"></i> 現在
+                        </button>
+                    </div>
                 </div>
                 <div class="col-span-1">
                     <label class="block text-xs font-bold text-gray-500 mb-1">預計歸還時間 <span class="text-red-500">*</span></label>
@@ -1101,7 +1106,12 @@
             tabs.forEach(t => {
                 const btn = document.getElementById('tab-' + t);
                 const panel = document.getElementById('panel-' + t);
-                if (btn) btn.className = t === tab ? activeClass : inactiveClass;
+                if (btn) {
+                    // 保留 hidden（未登入時 dept-mgmt 應隱藏）
+                    const isHidden = btn.classList.contains('hidden');
+                    btn.className = t === tab ? activeClass : inactiveClass;
+                    if (isHidden) btn.classList.add('hidden');
+                }
                 if (panel) panel.classList.toggle('hidden', t !== tab);
             });
             if (tab === 'inventory') renderInventory();
@@ -1679,6 +1689,17 @@
             });
         }
         window.refreshFormAvailableQty = refreshFormAvailableQty;
+
+        function setPickupNow() {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const val = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            document.getElementById('form-pickup-time').value = val;
+            refreshFormAvailableQty();
+        }
+        window.setPickupNow = setPickupNow;
+
+
 
         function syncPickupFromUseDate() {
             const dateOnly = document.getElementById('form-use-date').value;
