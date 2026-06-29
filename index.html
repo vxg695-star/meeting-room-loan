@@ -44,7 +44,7 @@
         <div class="bg-white rounded-xl shadow-sm p-2 flex border border-gray-100 max-w-md">
             <button onclick="switchTab('loan-list')" id="tab-loan-list" class="flex-1 py-2 text-center font-bold rounded-lg transition text-blue-600 bg-blue-50 text-sm">借用清單</button>
             <button onclick="switchTab('inventory')" id="tab-inventory" class="flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm">現有庫存狀態</button>
-            <button onclick="switchTab('dept-mgmt')" id="tab-dept-mgmt" class="flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm">管理單位清單</button>
+            <button onclick="switchTab('dept-mgmt')" id="tab-dept-mgmt" class="flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm hidden">管理單位清單</button>
         </div>
 
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4">
@@ -1118,17 +1118,17 @@
             if (activeTab === 'loan-list') {
                 label.innerHTML = `<i class="fa-solid fa-filter mr-1 text-blue-500"></i> 使用日期查詢：`;
                 tip.classList.add('hidden');
-                filterGroup.classList.remove('opacity-40', 'pointer-events-none');
+                filterGroup.classList.remove('hidden');
                 toolbar.classList.remove('hidden');
             } else if (activeTab === 'inventory') {
                 label.innerHTML = `<i class="fa-regular fa-calendar-days mr-1 text-blue-500"></i> 日期庫存查詢：`;
                 tip.classList.remove('hidden');
-                filterGroup.classList.add('opacity-40', 'pointer-events-none');
+                filterGroup.classList.add('hidden');
                 toolbar.classList.remove('hidden');
             } else {
-                label.innerHTML = `<i class="fa-regular fa-calendar-days mr-1 text-blue-500"></i> 日期庫存查詢：`;
+                label.innerHTML = '';
                 tip.classList.add('hidden');
-                filterGroup.classList.add('opacity-40', 'pointer-events-none');
+                filterGroup.classList.add('hidden');
                 toolbar.classList.add('hidden');
             }
         }
@@ -1176,6 +1176,7 @@
                 localStorage.setItem('borrow_curr_user_v6', JSON.stringify(currentUser));
                 updateLoginStatusUI();
                 closeLoginModal();
+                document.getElementById('tab-dept-mgmt').classList.remove('hidden');
                 renderLoanList();
                 renderInventory();
                 if (activeTab === 'dept-mgmt') renderDeptMgmt();
@@ -1189,9 +1190,10 @@
             currentUser = null;
             localStorage.removeItem('borrow_curr_user_v6');
             updateLoginStatusUI();
+            document.getElementById('tab-dept-mgmt').classList.add('hidden');
+            if (activeTab === 'dept-mgmt') switchTab('loan-list');
             renderLoanList();
             renderInventory();
-            if (activeTab === 'dept-mgmt') renderDeptMgmt();
         }
         window.handleLogout = handleLogout;
 
@@ -1199,7 +1201,9 @@
             const area = document.getElementById('login-status-area');
             const mgmtCard = document.getElementById('inventory-management-card');
             const statusCard = document.getElementById('inventory-status-card');
+            const deptTab = document.getElementById('tab-dept-mgmt');
             if (currentUser) {
+                if (deptTab) deptTab.classList.remove('hidden');
                 const roleBadge = currentUser.role === 'admin'
                     ? '<span class="bg-red-500/20 text-red-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-red-500/30">管理者</span>'
                     : '<span class="bg-blue-500/20 text-blue-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-blue-500/30">一般人員</span>';
@@ -1214,6 +1218,7 @@
                 mgmtCard.classList.remove('hidden');
                 statusCard.className = "bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden col-span-1";
             } else {
+                if (deptTab) deptTab.classList.add('hidden');
                 area.innerHTML = `<button onclick="openLoginModal()" class="bg-[#f59e0b] hover:bg-[#d97706] text-slate-900 text-xs font-bold px-3 py-1.5 rounded transition shadow">系統登入</button>`;
                 mgmtCard.classList.add('hidden');
                 statusCard.className = "bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden col-span-2 mx-auto max-w-xl w-full";
