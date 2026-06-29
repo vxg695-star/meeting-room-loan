@@ -939,7 +939,10 @@
                 onValue(ref(db, 'loans'), (snap) => {
                     if (snap.exists()) {
                         const raw = snap.val();
-                        loans = Object.values(raw).sort((a, b) => b.id.localeCompare(a.id));
+                        loans = Object.values(raw).sort((a, b) => {
+                    if (b.useDate !== a.useDate) return b.useDate > a.useDate ? 1 : -1;
+                    return b.id.localeCompare(a.id);
+                });
                     } else {
                         loans = [];
                     }
@@ -1818,7 +1821,7 @@
             const today = new Date();
             const todayStr = today.toISOString().split('T')[0];
             document.getElementById('current-date').innerText = todayStr.replace(/-/g, '/');
-            document.getElementById('search-start-date').value = todayStr;
+            // document.getElementById('search-start-date').value = todayStr; // 不預設篩選日期
             updateLoginStatusUI();
             buildLocationDropdown();
             refreshToolbarLayout();
