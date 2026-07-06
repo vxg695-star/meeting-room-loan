@@ -1451,6 +1451,10 @@ let handlerOptions = '';
                     const nowStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
                     loans[idx].pickupTime = nowStr;
                 }
+                if (field === 'status') {
+                    const loan = loans[idx];
+                    logAction('狀態變更', `單號: ${id} 借用人: ${loan.borrower} → ${value}`);
+                }
                 saveToStorage();
             }
         }
