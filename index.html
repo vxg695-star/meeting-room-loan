@@ -45,6 +45,7 @@
             <button onclick="switchTab('loan-list')" id="tab-loan-list" class="flex-1 py-2 text-center font-bold rounded-lg transition text-blue-600 bg-blue-50 text-sm">借用清單</button>
             <button onclick="switchTab('inventory')" id="tab-inventory" class="flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm">現有庫存狀態</button>
             <button onclick="switchTab('dept-mgmt')" id="tab-dept-mgmt" class="flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm hidden">管理單位清單</button>
+            <button onclick="switchTab('ip-log')" id="tab-ip-log" class="flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm hidden">操作紀錄</button>
         </div>
 
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4">
@@ -91,19 +92,18 @@
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
                 <table class="w-full text-left border-collapse min-w-[1000px]">
                     <thead>
-                        <tr class="bg-gray-50 border-b border-gray-100 text-gray-500 text-sm font-medium">
-                            <th class="p-4 w-10 text-center" id="th-checkbox"><input type="checkbox" id="check-all" onchange="toggleAllCheck(this.checked)" class="rounded text-blue-600 w-4 h-4 hidden"></th>
-                            <th class="p-4 w-40">狀態 / 領取時間</th>
-                            <th class="p-4">借用人</th>
-                            <th class="p-4">單位</th>
-                            <th class="p-4">分機/群呼</th>
-                            <th class="p-4">使用日期 / 時段</th>
-                            <th class="p-4">地點</th>
-                            <th class="p-4 w-72">借用物</th>
-                            <th class="p-4 w-40">預計歸還時間</th>
-                            <th class="p-4 w-32">經手人</th>
-                            <th class="p-4 max-w-xs">備註</th>
-                            <th class="p-4 text-center w-24">操作</th>
+                        <tr class="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs font-medium">
+                            <th class="px-2 py-3 w-8 text-center" id="th-checkbox"><input type="checkbox" id="check-all" onchange="toggleAllCheck(this.checked)" class="rounded text-blue-600 w-4 h-4 hidden"></th>
+                            <th class="px-3 py-3 w-28">狀態</th>
+                            <th class="px-3 py-3">借用人</th>
+                            <th class="px-3 py-3">單位</th>
+                            <th class="px-3 py-3 w-20">分機</th>
+                            <th class="px-3 py-3 w-36">使用日期/時段</th>
+                            <th class="px-3 py-3 w-24">地點</th>
+                            <th class="px-3 py-3">借用物</th>
+                            <th class="px-3 py-3 w-32">歸還時間</th>
+                            <th class="px-3 py-3">備註</th>
+                            <th class="px-3 py-3 text-center w-16">操作</th>
                         </tr>
                     </thead>
                     <tbody id="loan-table-body" class="text-sm divide-y divide-gray-100 text-gray-700"></tbody>
@@ -142,6 +142,30 @@
                             </tr>
                         </thead>
                         <tbody id="inventory-table-body" class="text-sm divide-y divide-gray-100 text-gray-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-ip-log" class="hidden space-y-3 max-w-4xl">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="font-bold text-sm text-gray-700"><i class="fa-solid fa-clipboard-list mr-2 text-blue-500"></i>申請單操作 IP 紀錄</h2>
+                    <button onclick="loadIPLogs()" class="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1 rounded-lg hover:bg-blue-100 transition"><i class="fa-solid fa-rotate-right mr-1"></i>重新整理</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs font-medium">
+                                <th class="px-4 py-2 w-40">時間</th>
+                                <th class="px-4 py-2 w-32">IP 位址</th>
+                                <th class="px-4 py-2 w-24">操作</th>
+                                <th class="px-4 py-2">說明</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ip-log-table-body" class="text-sm divide-y divide-gray-100 text-gray-700">
+                            <tr><td colspan="4" class="p-6 text-center text-gray-400">載入中…</td></tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -1001,6 +1025,30 @@
         }
         window.renderDeptMgmt = renderDeptMgmt;
 
+        async function loadIPLogs() {
+            const tbody = document.getElementById('ip-log-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-gray-400">載入中…</td></tr>';
+            try {
+                const snap = await get(ref(db, 'logs'));
+                if (!snap.exists()) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-gray-400">尚無紀錄</td></tr>';
+                    return;
+                }
+                const logs = Object.values(snap.val()).sort((a,b) => b.ts.localeCompare(a.ts));
+                tbody.innerHTML = logs.map(l => `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-2 font-mono text-xs text-gray-500">${l.ts}</td>
+                        <td class="px-4 py-2 font-mono text-xs text-blue-600">${l.ip}</td>
+                        <td class="px-4 py-2 text-xs font-medium">${l.action}</td>
+                        <td class="px-4 py-2 text-xs text-gray-500">${l.detail||''}</td>
+                    </tr>`).join('');
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-red-400">載入失敗</td></tr>';
+            }
+        }
+        window.loadIPLogs = loadIPLogs;
+
         function addDeptItem() {
             const code = document.getElementById('new-dept-code').value.trim().toUpperCase();
             const name = document.getElementById('new-dept-name').value.trim();
@@ -1051,6 +1099,28 @@
         window.saveToStorage = saveToStorage;
 
         // ---- 以下為原有邏輯（不變）----
+
+        // ── IP 紀錄 ──
+        async function getClientIP() {
+            try {
+                const r = await fetch('https://api.ipify.org?format=json');
+                const d = await r.json();
+                return d.ip || '未知';
+            } catch { return '未知'; }
+        }
+        async function logAction(action, detail) {
+            try {
+                const ip = await getClientIP();
+                const now = new Date();
+                const pad = n => String(n).padStart(2,'0');
+                const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                const logEntry = { ts, ip, action, detail: detail || '' };
+                await set(ref(db, 'logs/log_' + Date.now()), logEntry);
+            } catch(e) { console.warn('log error', e); }
+        }
+        window.logAction = logAction;
+
+
 
         function getLimitByName(name) {
             const found = inventoryArray.find(i => i.name === name);
@@ -1103,7 +1173,7 @@
 
         function switchTab(tab) {
             activeTab = tab;
-            const tabs = ['loan-list', 'inventory', 'dept-mgmt'];
+            const tabs = ['loan-list', 'inventory', 'dept-mgmt', 'ip-log'];
             const activeClass = "flex-1 py-2 text-center font-bold rounded-lg transition text-blue-600 bg-blue-50 text-sm";
             const inactiveClass = "flex-1 py-2 text-center font-bold rounded-lg transition text-gray-500 hover:text-gray-700 text-sm";
             tabs.forEach(t => {
@@ -1119,6 +1189,7 @@
             });
             if (tab === 'inventory') renderInventory();
             if (tab === 'dept-mgmt') renderDeptMgmt();
+            if (tab === 'ip-log') loadIPLogs();
             refreshToolbarLayout();
         }
         window.switchTab = switchTab;
@@ -1138,6 +1209,11 @@
                 tip.classList.remove('hidden');
                 filterGroup.classList.add('hidden');
                 toolbar.classList.remove('hidden');
+            } else if (activeTab === 'ip-log') {
+                label.innerHTML = '';
+                tip.classList.add('hidden');
+                filterGroup.classList.add('hidden');
+                toolbar.classList.add('hidden');
             } else {
                 label.innerHTML = '';
                 tip.classList.add('hidden');
@@ -1190,6 +1266,9 @@
                 updateLoginStatusUI();
                 closeLoginModal();
                 document.getElementById('tab-dept-mgmt').classList.remove('hidden');
+                if (currentUser && currentUser.role === 'admin') {
+                    document.getElementById('tab-ip-log').classList.remove('hidden');
+                }
                 renderLoanList();
                 renderInventory();
                 if (activeTab === 'dept-mgmt') renderDeptMgmt();
@@ -1204,6 +1283,7 @@
             localStorage.removeItem('borrow_curr_user_v6');
             updateLoginStatusUI();
             document.getElementById('tab-dept-mgmt').classList.add('hidden');
+            document.getElementById('tab-ip-log').classList.add('hidden');
             if (activeTab === 'dept-mgmt') switchTab('loan-list');
             renderLoanList();
             renderInventory();
@@ -1217,6 +1297,8 @@
             const deptTab = document.getElementById('tab-dept-mgmt');
             if (currentUser) {
                 if (deptTab) deptTab.classList.remove('hidden');
+                const ipTab = document.getElementById('tab-ip-log');
+                if (ipTab && currentUser.role === 'admin') ipTab.classList.remove('hidden');
                 const roleBadge = currentUser.role === 'admin'
                     ? '<span class="bg-red-500/20 text-red-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-red-500/30">管理者</span>'
                     : '<span class="bg-blue-500/20 text-blue-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-blue-500/30">一般人員</span>';
@@ -1232,6 +1314,8 @@
                 statusCard.className = "bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden col-span-1";
             } else {
                 if (deptTab) deptTab.classList.add('hidden');
+                const ipTab2 = document.getElementById('tab-ip-log');
+                if (ipTab2) ipTab2.classList.add('hidden');
                 area.innerHTML = `<button onclick="openLoginModal()" class="bg-[#f59e0b] hover:bg-[#d97706] text-slate-900 text-xs font-bold px-3 py-1.5 rounded transition shadow">系統登入</button>`;
                 mgmtCard.classList.add('hidden');
                 statusCard.className = "bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden col-span-2 mx-auto max-w-xl w-full";
@@ -1262,6 +1346,7 @@
             const startDate = document.getElementById('search-start-date').value;
             const endDate = document.getElementById('search-end-date').value;
             const filtered = loans.filter(item => {
+                if (currentFilterStatus === "全部" && item.status === "已歸還") return false;
                 if (currentFilterStatus !== "全部" && item.status !== currentFilterStatus) return false;
                 if (startDate && item.useDate < startDate) return false;
                 if (endDate && item.useDate > endDate) return false;
@@ -1301,29 +1386,20 @@
                 let returnTimeHtml = "—";
                 if (item.returnTime) {
                     const d = item.returnTime.split('T');
-                    returnTimeHtml = `<div class="font-medium text-gray-800">${d[0].replace(/-/g, '/')}</div><div class="text-xs text-gray-400">${d[1] || ''}</div>`;
+                    returnTimeHtml = `<span class="text-gray-800">${d[0].replace(/-/g,'/')}</span><span class="text-gray-400 ml-1">${d[1]||''}</span>`;
                 }
-                let handlerOptions = `<option value="—" ${item.handler === '—' ? 'selected' : ''}>—</option>` + staffList.map(name =>
-                    `<option value="${name}" ${item.handler === name ? 'selected' : ''}>${name}</option>`
-                ).join('');
-                let actionButtonsHtml = "";
-                if (currentUser) {
-                    actionButtonsHtml = `
-                        <button onclick="openLoanModal('${item.id}')" class="text-blue-600 hover:text-blue-800 p-1.5 rounded hover:bg-blue-50 transition" title="編輯借用單資料">
-                            <i class="fa-regular fa-pen-to-square text-base"></i>
-                        </button>
-                        <button onclick="handleCompleteLoan('${item.id}')" class="text-emerald-600 hover:text-emerald-800 p-1.5 rounded bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition" title="借用單結案">
-                            <i class="fa-solid fa-square-check text-base"></i>
+let handlerOptions = '';
+                let actionButtonsHtml = `
+                    <button onclick="openLoanModal('${item.id}')" class="text-blue-600 hover:text-blue-800 p-1.5 rounded hover:bg-blue-50 transition" title="編輯借用單資料">
+                        <i class="fa-regular fa-pen-to-square text-base"></i>
+                    </button>`;
+                if (currentUser && currentUser.role === 'admin') {
+                    actionButtonsHtml += `
+                        <button onclick="deleteLoan('${item.id}')" class="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition" title="刪除本單(僅限管理者)">
+                            <i class="fa-regular fa-trash-can text-base"></i>
                         </button>`;
-                    if (currentUser.role === 'admin') {
-                        actionButtonsHtml += `
-                            <button onclick="deleteLoan('${item.id}')" class="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition" title="刪除本單(僅限管理者)">
-                                <i class="fa-regular fa-trash-can text-base"></i>
-                            </button>`;
-                    }
-                } else {
-                    actionButtonsHtml = `
-                        <button onclick="openLoanModal('${item.id}')" class="text-blue-600 hover:text-blue-800 p-1.5 rounded bg-blue-50 border border-blue-100 transition" title="詳細檢視">
+                }
+                ')" class="text-blue-600 hover:text-blue-800 p-1.5 rounded bg-blue-50 border border-blue-100 transition" title="詳細檢視">
                             <i class="fa-regular fa-folder-open text-base"></i>
                         </button>`;
                 }
@@ -1335,36 +1411,31 @@
                     <td class="p-4 w-10 text-center" id="th-checkbox-cell">
                         ${currentUser && currentUser.role === 'admin' ? `<input type="checkbox" data-id="${item.id}" onchange="handleRowCheck(this)" class="row-check rounded text-blue-600 w-4 h-4">` : ''}
                     </td>
-                    <td class="p-4">
+                    <td class="px-3 py-2">
                         <select onchange="updateItemField('${item.id}', 'status', this.value)" class="text-xs font-bold border rounded px-1.5 py-1 ${statusBg} focus:outline-none cursor-pointer w-full text-center">
                             ${statusOptions}
                         </select>
                         ${isOverdue ? '<div class="mt-1 text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-center"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>逾期未還</div>' : ''}
                         ${inlinePickupTimeBlock}
                     </td>
-                    <td class="p-4 font-bold text-gray-900">${item.borrower}</td>
-                    <td class="p-4 text-gray-500">${item.dept}</td>
-                    <td class="p-4 text-gray-500">${item.phone}</td>
-                    <td class="p-4">
-                        <div class="font-medium text-gray-900 whitespace-nowrap">${item.useDate}</div>
-                        <div class="text-xs text-blue-600 font-medium">${formatPeriod(item.period)}</div>
+                    <td class="px-3 py-2 font-semibold text-gray-900 text-sm whitespace-nowrap">${item.borrower}</td>
+                    <td class="px-3 py-2 text-gray-700 text-sm">${item.dept.includes("_") ? item.dept.split("_").slice(1).join("_") : item.dept}</td>
+                    <td class="px-3 py-2 text-gray-500 text-sm">${item.phone}</td>
+                    <td class="px-3 py-2">
+                        <div class="text-sm font-medium text-gray-900 whitespace-nowrap">${item.useDate}</div>
+                        <div class="text-xs text-blue-600">${formatPeriod(item.period)}</div>
                     </td>
-                    <td class="p-4 text-gray-800 font-medium">${item.location}</td>
-                    <td class="p-4 cursor-pointer hover:bg-blue-50/40 rounded transition group" onclick="openInlineItemsModal('${item.id}')" title="點擊快速修改借用物品">
+                    <td class="px-3 py-2 text-gray-700 text-sm whitespace-nowrap">${item.location}</td>
+                    <td class="px-3 py-2 cursor-pointer hover:bg-blue-50/40 rounded transition group" onclick="openInlineItemsModal('${item.id}')" title="點擊快速修改借用物品">
                         <div class="flex flex-wrap items-center">
                             ${itemsHtml || '<span class="text-gray-400 text-xs italic">無選取物品</span>'}
                             <i class="fa-solid fa-pen text-gray-300 group-hover:text-blue-500 ml-auto pl-2 text-xs transition"></i>
                         </div>
                     </td>
-                    <td class="p-4">${returnTimeHtml}</td>
-                    <td class="p-4">
-                        <select onchange="updateItemField('${item.id}', 'handler', this.value)" class="w-full text-xs bg-gray-50 border border-gray-200 rounded p-1 focus:outline-none focus:border-blue-500">
-                            ${handlerOptions}
-                        </select>
-                        ${item.closeDate ? `<div class="mt-1 text-[11px] text-gray-400"><i class="fa-solid fa-check mr-0.5"></i>結案：${item.closeDate}</div>` : ''}
-                    </td>
-                    <td class="p-4 text-xs text-gray-400 max-w-xs truncate" title="${item.notes || ''}">${item.notes || '—'}</td>
-                    <td class="p-4 text-center">
+                    <td class="px-3 py-2 text-sm">${returnTimeHtml}</td>
+
+                    <td class="px-3 py-2 text-xs text-gray-400 max-w-[120px] truncate" title="${item.notes || ''}">${item.notes || '—'}</td>
+                    <td class="px-2 py-2 text-center">
                         <div class="flex items-center justify-center space-x-1">
                             ${actionButtonsHtml}
                         </div>
@@ -1528,29 +1599,24 @@
                 const currentQty = item.items[invItem.name] || 0;
                 const isChecked = currentQty > 0;
                 const avail = getAvailableQty(invItem.name, targetDate, targetDate, id);
-                const disabledAttr = currentUser ? "" : "disabled";
-                const div = document.createElement('div');
+                    const div = document.createElement('div');
                 div.className = "flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100/70 transition";
                 div.innerHTML = `
                     <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer flex-1 py-1">
-                        <input type="checkbox" id="inline-chk-${invItem.name}" ${isChecked ? 'checked' : ''} ${disabledAttr} onchange="toggleInlineQtyInput('${invItem.name}')" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                        <input type="checkbox" id="inline-chk-${invItem.name}" ${isChecked ? 'checked' : ''} onchange="toggleInlineQtyInput('${invItem.name}')" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
                         <div>
                             <div>${invItem.name}</div>
                             <div class="text-[10px] text-gray-400">目前剩餘可用：<span class="text-blue-600 font-bold">${avail}</span> / 上限 ${invItem.limit}</div>
                         </div>
                     </label>
                     <div class="flex items-center space-x-1 ${isChecked ? '' : 'opacity-30 pointer-events-none'}" id="inline-qty-box-${invItem.name}">
-                        <input type="number" id="inline-num-${invItem.name}" value="${currentQty || 1}" ${disabledAttr} min="1" max="${avail + currentQty}" class="w-16 bg-white border border-gray-300 rounded px-1.5 py-0.5 text-center text-sm focus:outline-none">
+                        <input type="number" id="inline-num-${invItem.name}" value="${currentQty || 1}" min="1" max="${avail + currentQty}" class="w-16 bg-white border border-gray-300 rounded px-1.5 py-0.5 text-center text-sm focus:outline-none">
                     </div>`;
                 container.appendChild(div);
             });
             const btnSave = document.getElementById('btn-save-inline-items');
-            if (currentUser) {
-                btnSave.onclick = saveInlineItems;
-                btnSave.classList.remove('hidden');
-            } else {
-                btnSave.classList.add('hidden');
-            }
+            btnSave.onclick = saveInlineItems;
+            btnSave.classList.remove('hidden');
             const m = document.getElementById('items-edit-modal');
             m.classList.remove('hidden');
             setTimeout(() => { m.classList.remove('opacity-0'); m.firstElementChild.classList.remove('scale-95'); }, 50);
@@ -1602,15 +1668,10 @@
             const m = document.getElementById('loan-modal');
             const title = document.getElementById('loan-modal-title');
             buildLocationDropdown();
-            const isNewLoan = !id;
             const inputs = m.querySelectorAll('input, select, textarea');
-            inputs.forEach(el => {
-                if (isNewLoan || currentUser) el.removeAttribute('disabled');
-                else el.setAttribute('disabled', 'true');
-            });
+            inputs.forEach(el => el.removeAttribute('disabled'));
             const saveBtn = m.querySelector('button[onclick="saveLoanForm()"]');
-            if (isNewLoan || currentUser) saveBtn.classList.remove('hidden');
-            else saveBtn.classList.add('hidden');
+            saveBtn.classList.remove('hidden');
             if (id) {
                 const item = loans.find(l => l.id === id);
                 if (!item) return;
@@ -1797,7 +1858,7 @@
                     loans[idx] = { ...loans[idx], borrower, dept, phone, useDate, period, location: finalLocation, pickupTime, returnTime, notes, items: selectedItems };
                 }
             } else {
-                const automaticHandler = currentUser ? currentUser.name : "—";
+
                 const newId = "L" + String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 10));
                 const newLoan = {
                     id: newId, status: "待領取",
@@ -1806,6 +1867,9 @@
                 };
                 loans.unshift(newLoan);
             }
+            const actionType = id ? '修改借用單' : '新增借用單';
+            const detail = `借用人: ${borrower} 單位: ${dept}`;
+            logAction(actionType, detail);
             saveToStorage();
             closeLoanModal();
         }
