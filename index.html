@@ -1019,7 +1019,7 @@
                 tr.innerHTML = `
                     <td class="px-4 py-2 font-mono text-xs text-gray-400">${code}</td>
                     <td class="px-4 py-2 font-medium text-gray-800">${name}</td>
-                    <td class="px-4 py-2 text-center">${currentUser ? `<button onclick="deleteDeptItem(${i})" class="text-gray-300 hover:text-red-500 text-sm p-1 transition" title="刪除"><i class="fa-regular fa-trash-can"></i></button>` : ''}</td>`;
+                    <td class="px-4 py-2 text-center">${currentUser ? '<button onclick="deleteDeptItem(' + i + ')" class="text-gray-300 hover:text-red-500 text-sm p-1 transition" title="刪除"><i class=\"fa-regular fa-trash-can\"></i></button>' : ''}</td>`;
                 tbody.appendChild(tr);
             });
         }
@@ -1399,17 +1399,13 @@ let handlerOptions = '';
                             <i class="fa-regular fa-trash-can text-base"></i>
                         </button>`;
                 }
-                ')" class="text-blue-600 hover:text-blue-800 p-1.5 rounded bg-blue-50 border border-blue-100 transition" title="詳細檢視">
-                            <i class="fa-regular fa-folder-open text-base"></i>
-                        </button>`;
-                }
                 const tr = document.createElement('tr');
                 const isReturned = item.status === '已歸還';
                 tr.style.cssText = isReturned ? 'background-color:#f3f4f6' : (item.markColor ? `background-color:${item.markColor}` : '');
                 tr.className = "transition-colors";
                 tr.innerHTML = `
                     <td class="p-4 w-10 text-center" id="th-checkbox-cell">
-                        ${currentUser && currentUser.role === 'admin' ? `<input type="checkbox" data-id="${item.id}" onchange="handleRowCheck(this)" class="row-check rounded text-blue-600 w-4 h-4">` : ''}
+                        ${currentUser && currentUser.role === 'admin' ? '<input type="checkbox" data-id="' + item.id + '" onchange="handleRowCheck(this)" class="row-check rounded text-blue-600 w-4 h-4">' : ''}
                     </td>
                     <td class="px-3 py-2">
                         <select onchange="updateItemField('${item.id}', 'status', this.value)" class="text-xs font-bold border rounded px-1.5 py-1 ${statusBg} focus:outline-none cursor-pointer w-full text-center">
@@ -1863,7 +1859,7 @@ let handlerOptions = '';
                 const newLoan = {
                     id: newId, status: "待領取",
                     borrower, dept, phone, useDate, period, location: finalLocation, pickupTime, returnTime, notes,
-                    items: selectedItems, handler: automaticHandler
+                    items: selectedItems
                 };
                 loans.unshift(newLoan);
             }
