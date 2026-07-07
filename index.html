@@ -96,7 +96,7 @@
                             <th class="px-2 py-3 w-8 text-center" id="th-checkbox"><input type="checkbox" id="check-all" onchange="toggleAllCheck(this.checked)" class="rounded text-blue-600 w-4 h-4 hidden"></th>
                             <th class="px-3 py-3 w-28">狀態</th>
                             <th class="px-3 py-3">借用人</th>
-                            <th class="px-3 py-3">單位</th>
+                            <th class="px-3 py-3 w-36">單位</th>
                             <th class="px-3 py-3 w-20">分機</th>
                             <th class="px-3 py-3 w-36">使用日期/時段</th>
                             <th class="px-3 py-3 w-24">地點</th>
@@ -1386,7 +1386,7 @@
                 let returnTimeHtml = "—";
                 if (item.returnTime) {
                     const d = item.returnTime.split('T');
-                    returnTimeHtml = `<span class="text-gray-800">${d[0].replace(/-/g,'/')}</span><span class="text-gray-400 ml-1">${d[1]||''}</span>`;
+                    returnTimeHtml = `<div class="text-sm font-medium text-gray-900 whitespace-nowrap">${d[0].replace(/-/g,'/')}</div><div class="text-xs text-gray-400">${d[1]||''}</div>`;
                 }
 let handlerOptions = '';
                 let actionButtonsHtml = `
@@ -1415,7 +1415,7 @@ let handlerOptions = '';
                         ${inlinePickupTimeBlock}
                     </td>
                     <td class="px-3 py-2 font-semibold text-gray-900 text-sm whitespace-nowrap">${item.borrower}</td>
-                    <td class="px-3 py-2 text-gray-700 text-sm">${item.dept.includes("_") ? item.dept.split("_").slice(1).join("_") : item.dept}</td>
+                    <td class="px-3 py-2 text-gray-700 text-sm w-36 max-w-[144px]">${item.dept.includes("_") ? item.dept.split("_").slice(1).join("_") : item.dept}</td>
                     <td class="px-3 py-2 text-gray-500 text-sm">${item.phone}</td>
                     <td class="px-3 py-2">
                         <div class="text-sm font-medium text-gray-900 whitespace-nowrap">${item.useDate}</div>
