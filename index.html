@@ -230,9 +230,63 @@
                     <label class="block text-xs font-bold text-gray-500 mb-1">使用時段 <span class="text-red-500">*</span></label>
                     <div class="flex items-center gap-2 flex-wrap">
                         <input type="date" id="form-use-date" onchange="refreshFormAvailableQty(); syncPickupFromUseDate()" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
-                        <input type="time" id="form-time-start" onchange="syncPickupFromUseDate()" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
-                        <span class="text-gray-400 text-sm font-medium">～</span>
-                        <input type="time" id="form-period" onchange="refreshFormAvailableQty()" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                            <input type="checkbox" id="form-allday" onchange="toggleAllDay(this.checked)" class="rounded text-blue-600 w-4 h-4">
+                            整天
+                        </label>
+                        <div id="form-time-range" class="flex items-center gap-2">
+                            <select id="form-time-start" onchange="syncPickupFromUseDate()" class="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500">
+                                <option value="07:00前">07:00前</option>
+<option value="07:00">07:00</option>
+<option value="07:30">07:30</option>
+<option value="08:00">08:00</option>
+<option value="08:30">08:30</option>
+<option value="09:00">09:00</option>
+<option value="09:30">09:30</option>
+<option value="10:00">10:00</option>
+<option value="10:30">10:30</option>
+<option value="11:00">11:00</option>
+<option value="11:30">11:30</option>
+<option value="12:00">12:00</option>
+<option value="12:30">12:30</option>
+<option value="13:00">13:00</option>
+<option value="13:30">13:30</option>
+<option value="14:00">14:00</option>
+<option value="14:30">14:30</option>
+<option value="15:00">15:00</option>
+<option value="15:30">15:30</option>
+<option value="16:00">16:00</option>
+<option value="16:30">16:30</option>
+<option value="17:00">17:00</option>
+<option value="17:00後">17:00後</option>
+                            </select>
+                            <span class="text-gray-400 text-sm font-medium">～</span>
+                            <select id="form-period" onchange="refreshFormAvailableQty()" class="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500">
+                                <option value="07:00前">07:00前</option>
+<option value="07:00">07:00</option>
+<option value="07:30">07:30</option>
+<option value="08:00">08:00</option>
+<option value="08:30">08:30</option>
+<option value="09:00">09:00</option>
+<option value="09:30">09:30</option>
+<option value="10:00">10:00</option>
+<option value="10:30">10:30</option>
+<option value="11:00">11:00</option>
+<option value="11:30">11:30</option>
+<option value="12:00">12:00</option>
+<option value="12:30">12:30</option>
+<option value="13:00">13:00</option>
+<option value="13:30">13:30</option>
+<option value="14:00">14:00</option>
+<option value="14:30">14:30</option>
+<option value="15:00">15:00</option>
+<option value="15:30">15:30</option>
+<option value="16:00">16:00</option>
+<option value="16:30">16:30</option>
+<option value="17:00">17:00</option>
+<option value="17:00後">17:00後</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="col-span-1">
@@ -243,8 +297,33 @@
                 </div>
                 <div class="col-span-1">
                     <label class="block text-xs font-bold text-gray-500 mb-1">領取日期時間 <span class="text-red-500">*</span></label>
-                    <div class="flex gap-2 items-center">
-                        <input type="datetime-local" id="form-pickup-time" onchange="refreshFormAvailableQty()" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    <div class="flex gap-2 items-center flex-wrap">
+                        <input type="date" id="form-pickup-date" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <select id="form-pickup-time" onchange="refreshFormAvailableQty()" class="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500">
+                            <option value="07:00前">07:00前</option>
+<option value="07:00">07:00</option>
+<option value="07:30">07:30</option>
+<option value="08:00">08:00</option>
+<option value="08:30">08:30</option>
+<option value="09:00">09:00</option>
+<option value="09:30">09:30</option>
+<option value="10:00">10:00</option>
+<option value="10:30">10:30</option>
+<option value="11:00">11:00</option>
+<option value="11:30">11:30</option>
+<option value="12:00">12:00</option>
+<option value="12:30">12:30</option>
+<option value="13:00">13:00</option>
+<option value="13:30">13:30</option>
+<option value="14:00">14:00</option>
+<option value="14:30">14:30</option>
+<option value="15:00">15:00</option>
+<option value="15:30">15:30</option>
+<option value="16:00">16:00</option>
+<option value="16:30">16:30</option>
+<option value="17:00">17:00</option>
+<option value="17:00後">17:00後</option>
+                        </select>
                         <button type="button" onclick="setPickupNow()" class="shrink-0 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium px-2.5 py-2 rounded-lg transition flex items-center gap-1 shadow-sm" title="填入現在時間">
                             <i class="fa-regular fa-clock"></i> 現在
                         </button>
@@ -252,7 +331,34 @@
                 </div>
                 <div class="col-span-1">
                     <label class="block text-xs font-bold text-gray-500 mb-1">預計歸還時間 <span class="text-red-500">*</span></label>
-                    <input type="datetime-local" id="form-return-time" onchange="refreshFormAvailableQty()" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    <div class="flex gap-2 flex-wrap">
+                        <input type="date" id="form-return-date" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <select id="form-return-time" onchange="refreshFormAvailableQty()" class="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500">
+                            <option value="07:00前">07:00前</option>
+<option value="07:00">07:00</option>
+<option value="07:30">07:30</option>
+<option value="08:00">08:00</option>
+<option value="08:30">08:30</option>
+<option value="09:00">09:00</option>
+<option value="09:30">09:30</option>
+<option value="10:00">10:00</option>
+<option value="10:30">10:30</option>
+<option value="11:00">11:00</option>
+<option value="11:30">11:30</option>
+<option value="12:00">12:00</option>
+<option value="12:30">12:30</option>
+<option value="13:00">13:00</option>
+<option value="13:30">13:30</option>
+<option value="14:00">14:00</option>
+<option value="14:30">14:30</option>
+<option value="15:00">15:00</option>
+<option value="15:30">15:30</option>
+<option value="16:00">16:00</option>
+<option value="16:30">16:30</option>
+<option value="17:00">17:00</option>
+<option value="17:00後">17:00後</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="col-span-2">
                     <label class="block text-xs font-bold text-gray-500 mb-1">備註</label>
@@ -1684,11 +1790,20 @@ let handlerOptions = '';
                 document.getElementById('form-phone').value = item.phone;
                 document.getElementById('form-use-date').value = item.useDate || '';
                 // period stored as "HH:MM ～ HH:MM" or legacy text
-                const periodParts = item.period ? item.period.split(' ～ ') : [];
-                document.getElementById('form-time-start').value = periodParts[0] && periodParts[0].match(/^\d{2}:\d{2}$/) ? periodParts[0] : '';
-                document.getElementById('form-period').value = periodParts[1] && periodParts[1].match(/^\d{2}:\d{2}$/) ? periodParts[1] : '';
-                document.getElementById('form-pickup-time').value = item.pickupTime || "";
-                document.getElementById('form-return-time').value = item.returnTime || "";
+                const isAllDayEdit = item.period === '整天';
+                document.getElementById('form-allday').checked = isAllDayEdit;
+                document.getElementById('form-time-range').classList.toggle('hidden', isAllDayEdit);
+                if (!isAllDayEdit) {
+                    const periodParts = item.period ? item.period.split(' ～ ') : [];
+                    document.getElementById('form-time-start').value = periodParts[0] && /^\d{2}:\d{2}$/.test(periodParts[0]) ? periodParts[0] : '09:00';
+                    document.getElementById('form-period').value = periodParts[1] && /^\d{2}:\d{2}$/.test(periodParts[1]) ? periodParts[1] : '18:00';
+                }
+                const ptParts = (item.pickupTime || '').split('T');
+                document.getElementById('form-pickup-date').value = ptParts[0] || '';
+                document.getElementById('form-pickup-time').value = ptParts[1] ? ptParts[1].slice(0,5) : '09:00';
+                const rtParts = (item.returnTime || '').split('T');
+                document.getElementById('form-return-date').value = rtParts[0] || '';
+                document.getElementById('form-return-time').value = rtParts[1] ? rtParts[1].slice(0,5) : '18:00';
                 document.getElementById('form-notes').value = item.notes;
                 const selectLoc = document.getElementById('form-location');
                 const customInput = document.getElementById('form-location-custom');
@@ -1709,11 +1824,16 @@ let handlerOptions = '';
                 document.getElementById('form-phone').value = "";
                 const searchStart = document.getElementById('search-start-date').value;
                 const todayStr = new Date().toISOString().split('T')[0];
-                document.getElementById('form-use-date').value = searchStart || todayStr;
+                const defDate = searchStart || todayStr;
+                document.getElementById('form-use-date').value = defDate;
+                document.getElementById('form-allday').checked = false;
+                document.getElementById('form-time-range').classList.remove('hidden');
                 document.getElementById('form-time-start').value = '09:00';
-                document.getElementById('form-period').value = '18:00';
-                document.getElementById('form-pickup-time').value = (searchStart || todayStr) + 'T09:00';
-                document.getElementById('form-return-time').value = (searchStart || todayStr) + 'T18:00';
+                document.getElementById('form-period').value = '17:00';
+                document.getElementById('form-pickup-date').value = defDate;
+                document.getElementById('form-pickup-time').value = '09:00';
+                document.getElementById('form-return-date').value = defDate;
+                document.getElementById('form-return-time').value = '17:00';
                 document.getElementById('form-notes').value = "";
                 document.getElementById('form-location').value = LOCATION_OPTIONS[0];
                 document.getElementById('form-location-custom').classList.add('hidden');
@@ -1761,9 +1881,16 @@ let handlerOptions = '';
 
         function setPickupNow() {
             const now = new Date();
-            const pad = n => String(n).padStart(2, '0');
-            const val = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-            document.getElementById('form-pickup-time').value = val;
+            const pad = n => String(n).padStart(2,'0');
+            const dateVal = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+            const mins = now.getMinutes() < 30 ? '00' : '30';
+            const h = now.getHours();
+            let timeVal;
+            if (h < 7 || (h === 7 && now.getMinutes() < 0)) timeVal = '07:00前';
+            else if (h > 17 || (h === 17 && now.getMinutes() > 0)) timeVal = '17:00後';
+            else timeVal = `${pad(h)}:${mins}`;
+            document.getElementById('form-pickup-date').value = dateVal;
+            document.getElementById('form-pickup-time').value = timeVal;
             refreshFormAvailableQty();
         }
         window.setPickupNow = setPickupNow;
@@ -1774,12 +1901,12 @@ let handlerOptions = '';
             const dateOnly = document.getElementById('form-use-date').value;
             const timeStart = document.getElementById('form-time-start').value || '09:00';
             if (!dateOnly) return;
-            if (!document.getElementById('form-pickup-time').value)
-                document.getElementById('form-pickup-time').value = dateOnly + 'T' + timeStart;
+            if (!document.getElementById('form-pickup-date').value)
+                document.getElementById('form-pickup-date').value = dateOnly;
+            if (!document.getElementById('form-return-date').value)
+                document.getElementById('form-return-date').value = dateOnly;
             if (!document.getElementById('form-return-time').value)
-                document.getElementById('form-return-time').value = dateOnly + 'T18:00';
-            if (!document.getElementById('form-period').value)
-                document.getElementById('form-period').value = '18:00';
+                document.getElementById('form-return-time').value = '17:00';
         }
         function formatPeriod(period) {
             if (!period) return '';
@@ -1791,6 +1918,20 @@ let handlerOptions = '';
         window.formatPeriod = formatPeriod;
 
         window.syncPickupFromUseDate = syncPickupFromUseDate;
+
+        function toggleAllDay(checked) {
+            const timeRange = document.getElementById('form-time-range');
+            if (checked) {
+                timeRange.classList.add('hidden');
+                document.getElementById('form-time-start').value = '08:00';
+                document.getElementById('form-period').value = '17:00';
+            } else {
+                timeRange.classList.remove('hidden');
+            }
+        }
+        window.toggleAllDay = toggleAllDay;
+
+
 
 
 
@@ -1816,11 +1957,16 @@ let handlerOptions = '';
             const dept = document.getElementById('form-dept').value.trim();
             const phone = document.getElementById('form-phone').value.trim();
             const useDate = document.getElementById('form-use-date').value || '';
+            const isAllDay = document.getElementById('form-allday').checked;
             const timeStart = document.getElementById('form-time-start').value || '';
             const timeEnd = document.getElementById('form-period').value || '';
-            const period = timeStart && timeEnd ? timeStart + ' ～ ' + timeEnd : (timeStart || timeEnd || '');
-            const pickupTime = document.getElementById('form-pickup-time').value;
-            const returnTime = document.getElementById('form-return-time').value;
+            const period = isAllDay ? '整天' : (timeStart && timeEnd ? timeStart + ' ～ ' + timeEnd : (timeStart || timeEnd || ''));
+            const pickupDate = document.getElementById('form-pickup-date').value;
+            const pickupTimeVal = document.getElementById('form-pickup-time').value;
+            const pickupTime = pickupDate && pickupTimeVal ? pickupDate + 'T' + pickupTimeVal : '';
+            const returnDate = document.getElementById('form-return-date').value;
+            const returnTimeVal = document.getElementById('form-return-time').value;
+            const returnTime = returnDate && returnTimeVal ? returnDate + 'T' + returnTimeVal : '';
             const notes = document.getElementById('form-notes').value.trim();
             const selectLoc = document.getElementById('form-location').value;
             let finalLocation = selectLoc;
