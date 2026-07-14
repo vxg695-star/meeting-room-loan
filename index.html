@@ -2018,7 +2018,7 @@ let handlerOptions = '';
 
                 const newId = "L" + String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 10));
                 const newLoan = {
-                    id: newId, status: "待領取",
+                    id: newId, status: document.getElementById("form-status").value || "待領取",
                     borrower, dept, phone, useDate, period, location: finalLocation, pickupTime, returnTime, notes,
                     items: selectedItems
                 };
