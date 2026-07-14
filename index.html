@@ -213,6 +213,7 @@
             </div>
             <div class="p-6 overflow-y-auto space-y-4 flex-1 grid grid-cols-2 gap-4">
                 <input type="hidden" id="form-loan-id">
+                <input type="hidden" id="form-status" value="待領取">
                 <div class="col-span-1">
                     <label class="block text-xs font-bold text-gray-500 mb-1">借用人 <span class="text-red-500">*</span></label>
                     <input type="text" id="form-borrower" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
@@ -1785,6 +1786,7 @@ let handlerOptions = '';
                     ? `<i class="fa-regular fa-pen-to-square mr-1.5 text-blue-400"></i>編輯借用單 (${id})`
                     : `<i class="fa-regular fa-folder-open mr-1.5 text-blue-400"></i>檢視借用單資料 (${id})`;
                 document.getElementById('form-loan-id').value = item.id;
+                document.getElementById('form-status').value = item.status || '待領取';
                 document.getElementById('form-borrower').value = item.borrower;
                 document.getElementById('form-dept').value = item.dept;
                 document.getElementById('form-phone').value = item.phone;
@@ -1819,6 +1821,7 @@ let handlerOptions = '';
             } else {
                 title.innerHTML = `＋ 新增借用單`;
                 document.getElementById('form-loan-id').value = "";
+                document.getElementById('form-status').value = '待領取';
                 document.getElementById('form-borrower').value = "";
                 document.getElementById('form-dept').value = "";
                 document.getElementById('form-phone').value = "";
@@ -1891,6 +1894,8 @@ let handlerOptions = '';
             else timeVal = `${pad(h)}:${mins}`;
             document.getElementById('form-pickup-date').value = dateVal;
             document.getElementById('form-pickup-time').value = timeVal;
+            // 自動將狀態改為借用中
+            document.getElementById('form-status').value = '借用中';
             refreshFormAvailableQty();
         }
         window.setPickupNow = setPickupNow;
@@ -2001,7 +2006,13 @@ let handlerOptions = '';
             if (id) {
                 const idx = loans.findIndex(l => l.id === id);
                 if (idx !== -1) {
-                    loans[idx] = { ...loans[idx], borrower, dept, phone, useDate, period, location: finalLocation, pickupTime, returnTime, notes, items: selectedItems };
+                    const newStatus = document.getElementById('form-status').value;
+            const prevStatus = loans[idx].status;
+            loans[idx] = { ...loans[idx], borrower, dept, phone, useDate, period, location: finalLocation, pickupTime, returnTime, notes, items: selectedItems };
+            if (newStatus === '借用中' && prevStatus !== '借用中') {
+                loans[idx].status = '借用中';
+                logAction('狀態變更', `單號: ${id} 借用人: ${borrower} → 借用中（現場領取）`);
+            }
                 }
             } else {
 
