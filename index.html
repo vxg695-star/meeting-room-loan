@@ -1030,8 +1030,11 @@
         async function initFirebase() {
             try {
                 // 初始化庫存（若 Firebase 無資料，寫入預設值）
-                // Init depts (always sync to latest list from code)
-                await set(ref(db, 'depts'), DEPT_LIST);
+                // Init depts: only write if Firebase is empty
+                const deptInitSnap = await get(ref(db, 'depts'));
+                if (!deptInitSnap.exists()) {
+                    await set(ref(db, 'depts'), DEPT_LIST);
+                }
 
                 const invSnap = await get(ref(db, 'inventory'));
                 if (!invSnap.exists()) {
@@ -1156,7 +1159,7 @@
         }
         window.loadIPLogs = loadIPLogs;
 
-        function addDeptItem() {
+        async function addDeptItem() {
             const code = document.getElementById('new-dept-code').value.trim().toUpperCase();
             const name = document.getElementById('new-dept-name').value.trim();
             if (!code || !name) { alert('請填寫代碼與單位名稱'); return; }
@@ -1164,18 +1167,18 @@
             if (DEPT_LIST.includes(entry)) { alert('此單位已存在'); return; }
             DEPT_LIST.push(entry);
             DEPT_LIST.sort();
-            saveDepts();
+            await saveDepts();
             document.getElementById('new-dept-code').value = '';
             document.getElementById('new-dept-name').value = '';
             renderDeptMgmt();
         }
         window.addDeptItem = addDeptItem;
 
-        function deleteDeptItem(index) {
+        async function deleteDeptItem(index) {
             const d = DEPT_LIST[index];
             if (!confirm(`確定要刪除「${d}」嗎？`)) return;
             DEPT_LIST.splice(index, 1);
-            saveDepts();
+            await saveDepts();
             renderDeptMgmt();
         }
         window.deleteDeptItem = deleteDeptItem;
