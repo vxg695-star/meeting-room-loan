@@ -1237,24 +1237,50 @@
             return found ? found.limit : 0;
         }
 
-        function getAvailableQty(itemName, targetStartDate, targetEndDate, excludeLoanId = null) {
+        // ── 以精確時間區間計算可用數量 ──
+        // tStart / tEnd: timestamp（毫秒），代表欲借用的時間區間
+        function getAvailableQtyByTime(itemName, tStart, tEnd, excludeLoanId = null) {
             const totalLimit = getLimitByName(itemName);
-            let queryDate = targetStartDate || new Date().toISOString().split('T')[0];
-            const tStart = new Date(queryDate + "T00:00:00").getTime();
-            const tEnd = targetEndDate ? new Date(targetEndDate + "T23:59:59").getTime() : new Date(queryDate + "T23:59:59").getTime();
             let borrowedQty = 0;
             loans.forEach(loan => {
                 if (loan.id === excludeLoanId) return;
                 if (loan.status === '已歸還') return;
                 if (!loan.items[itemName]) return;
-                let loanStart = loan.pickupTime ? new Date(loan.pickupTime).getTime() : new Date(loan.useDate + "T00:00:00").getTime();
-                let loanEnd = loan.returnTime ? new Date(loan.returnTime).getTime() : new Date(loan.useDate + "T23:59:59").getTime();
-                if (loanStart <= tEnd && loanEnd >= tStart) {
+                const loanStart = loan.pickupTime ? new Date(loan.pickupTime).getTime()
+                    : new Date(loan.useDate + 'T00:00:00').getTime();
+                const loanEnd = loan.returnTime ? new Date(loan.returnTime).getTime()
+                    : new Date(loan.useDate + 'T23:59:59').getTime();
+                if (loanStart < tEnd && loanEnd > tStart) {
                     borrowedQty += (parseInt(loan.items[itemName]) || 0);
                 }
             });
-            const finalAvailable = totalLimit - borrowedQty;
-            return finalAvailable < 0 ? 0 : finalAvailable;
+            return Math.max(0, totalLimit - borrowedQty);
+        }
+
+        // 舊介面保留（庫存頁日期查詢用）
+        function getAvailableQty(itemName, targetStartDate, targetEndDate, excludeLoanId = null) {
+            const queryDate = targetStartDate || new Date().toISOString().split('T')[0];
+            const tStart = new Date(queryDate + 'T00:00:00').getTime();
+            const tEnd = targetEndDate
+                ? new Date(targetEndDate + 'T23:59:59').getTime()
+                : new Date(queryDate + 'T23:59:59').getTime();
+            return getAvailableQtyByTime(itemName, tStart, tEnd, excludeLoanId);
+        }
+
+        // 取得某物品在指定時間後的下一筆借用時間（用於警示）
+        function getNextLoanTime(itemName, afterTs, excludeLoanId = null) {
+            let nearest = null;
+            loans.forEach(loan => {
+                if (loan.id === excludeLoanId) return;
+                if (loan.status === '已歸還') return;
+                if (!loan.items[itemName]) return;
+                const loanStart = loan.pickupTime ? new Date(loan.pickupTime).getTime()
+                    : new Date(loan.useDate + 'T00:00:00').getTime();
+                if (loanStart >= afterTs) {
+                    if (nearest === null || loanStart < nearest) nearest = loanStart;
+                }
+            });
+            return nearest;
         }
         window.getAvailableQty = getAvailableQty;
 
@@ -1708,7 +1734,9 @@ let handlerOptions = '';
             inventoryArray.forEach(invItem => {
                 const currentQty = item.items[invItem.name] || 0;
                 const isChecked = currentQty > 0;
-                const avail = getAvailableQty(invItem.name, targetDate, targetDate, id);
+                const loanPickup = item.pickupTime ? new Date(item.pickupTime).getTime() : new Date(item.useDate + 'T00:00:00').getTime();
+                const loanReturn = item.returnTime ? new Date(item.returnTime).getTime() : new Date(item.useDate + 'T23:59:59').getTime();
+                const avail = getAvailableQtyByTime(invItem.name, loanPickup, loanReturn, id);
                     const div = document.createElement('div');
                 div.className = "flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100/70 transition";
                 div.innerHTML = `
@@ -1856,24 +1884,55 @@ let handlerOptions = '';
             itemsContainer.innerHTML = "";
             const id = document.getElementById('form-loan-id').value;
             const useDate = document.getElementById('form-use-date').value || '';
+            const timeStartVal = document.getElementById('form-time-start').value || '00:00';
+            const timeEndVal = document.getElementById('form-period').value || '23:59';
+            const pickupDateVal = document.getElementById('form-pickup-date').value || useDate;
+            const pickupTimeVal = document.getElementById('form-pickup-time').value || '00:00';
+            const returnDateVal = document.getElementById('form-return-date').value || useDate;
+            const returnTimeVal = document.getElementById('form-return-time').value || '23:59';
+
+            // 以領取時間～歸還時間作為佔用區間；若未填則退回使用時段
+            const tStart = pickupDateVal
+                ? new Date(pickupDateVal + 'T' + pickupTimeVal).getTime()
+                : (useDate ? new Date(useDate + 'T' + timeStartVal).getTime() : Date.now());
+            const tEnd = returnDateVal
+                ? new Date(returnDateVal + 'T' + returnTimeVal).getTime()
+                : (useDate ? new Date(useDate + 'T' + timeEndVal).getTime() : Date.now() + 86400000);
+
             const calcTip = document.getElementById('form-qty-calc-tip');
-            if (useDate) calcTip.innerHTML = `（依據 <b>${useDate}</b> 演算當前可用餘額）`;
-            else calcTip.innerHTML = `（請先填寫上方使用日期）`;
+            if (pickupDateVal && returnDateVal) {
+                calcTip.innerHTML = `（依 <b>${pickupDateVal} ${pickupTimeVal}</b> ～ <b>${returnDateVal} ${returnTimeVal}</b> 計算餘額）`;
+            } else if (useDate) {
+                calcTip.innerHTML = `（依據 <b>${useDate}</b> 演算當前可用餘額）`;
+            } else {
+                calcTip.innerHTML = `（請先填寫使用日期與時間）`;
+            }
+
             const currentLoanItemMap = id ? (loans.find(l => l.id === id)?.items || {}) : {};
             const editingId = document.getElementById('form-loan-id').value;
             const disabledAttr = (!editingId || currentUser) ? "" : "disabled";
+
             inventoryArray.forEach(invItem => {
                 const originalQty = currentLoanItemMap[invItem.name] || 0;
                 const isChecked = originalQty > 0;
-                const avail = getAvailableQty(invItem.name, useDate, useDate, id ? id : null);
+                const avail = getAvailableQtyByTime(invItem.name, tStart, tEnd, id || null);
                 const maxAllowed = avail + originalQty;
+
+                // 警示：下一筆借用在 2 小時內
+                const nextTs = getNextLoanTime(invItem.name, tEnd, id || null);
+                const warningMins = nextTs ? Math.round((nextTs - tEnd) / 60000) : null;
+                const showWarn = warningMins !== null && warningMins <= 180;
+                const warnHtml = showWarn
+                    ? `<span class="text-amber-600 font-bold ml-1" title="下一筆借用在 ${warningMins} 分鐘後">⚠ ${warningMins < 60 ? warningMins + '分鐘後有人借' : Math.floor(warningMins/60) + '小時後有人借'}</span>`
+                    : '';
+
                 const div = document.createElement('div');
-                div.className = "flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-200 text-xs";
+                div.className = "flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-200 text-xs" + (showWarn ? ' border-amber-300 bg-amber-50' : '');
                 div.innerHTML = `
                     <label class="flex items-center space-x-1.5 cursor-pointer flex-1">
                         <input type="checkbox" id="form-chk-${invItem.name}" ${isChecked ? 'checked' : ''} ${disabledAttr} onchange="toggleFormQtyInput('${invItem.name}')" class="rounded text-blue-600 focus:ring-blue-400">
                         <div>
-                            <span class="font-medium text-gray-700">${invItem.name}</span>
+                            <span class="font-medium text-gray-700">${invItem.name}</span>${warnHtml}
                             <span class="text-[10px] text-gray-400 block">剩餘 <b>${avail}</b> / 總數 ${invItem.limit}</span>
                         </div>
                     </label>
@@ -1993,7 +2052,9 @@ let handlerOptions = '';
                 if (chk && chk.checked) {
                     const qty = parseInt(document.getElementById('form-num-' + invItem.name).value) || 1;
                     const originalQty = id ? ((loans.find(l => l.id === id)?.items || {})[invItem.name] || 0) : 0;
-                    const maxAllowed = getAvailableQty(invItem.name, useDate, useDate, id ? id : null) + originalQty;
+                    const _sTs = pickupTime ? new Date(pickupTime).getTime() : new Date((useDate||'1970-01-01')+'T00:00:00').getTime();
+                    const _eTs = returnTime ? new Date(returnTime).getTime() : new Date((useDate||'1970-01-01')+'T23:59:59').getTime();
+                    const maxAllowed = getAvailableQtyByTime(invItem.name, _sTs, _eTs, id || null) + originalQty;
                     if (qty > maxAllowed) {
                         alert(`「${invItem.name}」數量超過可用餘額！`);
                         isOverLimit = true;
