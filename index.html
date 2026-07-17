@@ -54,6 +54,7 @@
                 <button onclick="filterStatus('待領取')" id="btn-filter-pending" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-600 hover:text-gray-900">待領取 <span id="count-pending" class="ml-1 text-xs opacity-80">0</span></button>
                 <button onclick="filterStatus('借用中')" id="btn-filter-borrowing" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-600 hover:text-gray-900">借用中 <span id="count-borrowing" class="ml-1 text-xs opacity-80">0</span></button>
                 <button onclick="filterStatus('已歸還')" id="btn-filter-returned" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-600 hover:text-gray-900">已歸還 <span id="count-returned" class="ml-1 text-xs opacity-80">0</span></button>
+                <button onclick="filterStatus('自取交接')" id="btn-filter-handoff" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-600 hover:text-gray-900">自取交接 <span id="count-handoff" class="ml-1 text-xs opacity-80">0</span></button>
             </div>
 
             <div class="flex items-center space-x-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 text-sm">
@@ -1246,7 +1247,7 @@
             let borrowedQty = 0;
             loans.forEach(loan => {
                 if (loan.id === excludeLoanId) return;
-                if (loan.status === '已歸還') return;
+                if (loan.status === '已歸還' || loan.status === '自取交接') return;
                 if (!loan.items[itemName]) return;
                 const loanStart = loan.pickupTime ? new Date(loan.pickupTime).getTime()
                     : new Date(loan.useDate + 'T00:00:00').getTime();
@@ -1277,7 +1278,7 @@
             let nearest = null;
             loans.forEach(loan => {
                 if (loan.id === excludeLoanId) return;
-                if (loan.status === '已歸還') return;
+                if (loan.status === '已歸還' || loan.status === '自取交接') return;
                 if (!loan.items[itemName]) return;
                 const loanStart = loan.pickupTime
                     ? new Date(loan.pickupTime).getTime()
@@ -1469,10 +1470,10 @@
 
         function filterStatus(status) {
             currentFilterStatus = status;
-            ["all", "pending", "borrowing", "returned"].forEach(id => {
+            ["all", "pending", "borrowing", "returned", "handoff"].forEach(id => {
                 document.getElementById(`btn-filter-${id}`).className = "px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-600 hover:text-gray-900";
             });
-            const activeIdMap = { "全部": "all", "待領取": "pending", "借用中": "borrowing", "已歸還": "returned" };
+            const activeIdMap = { "全部": "all", "待領取": "pending", "借用中": "borrowing", "已歸還": "returned", "自取交接": "handoff" };
             document.getElementById(`btn-filter-${activeIdMap[status]}`).className = "px-4 py-1.5 rounded-md text-sm font-medium transition bg-slate-800 text-white shadow-sm";
             renderLoanList();
         }
@@ -1483,6 +1484,8 @@
             document.getElementById('count-pending').innerText = loans.filter(l => l.status === '待領取').length;
             document.getElementById('count-borrowing').innerText = loans.filter(l => l.status === '借用中').length;
             document.getElementById('count-returned').innerText = loans.filter(l => l.status === '已歸還').length;
+            const handoffEl = document.getElementById('count-handoff');
+            if (handoffEl) handoffEl.innerText = loans.filter(l => l.status === '自取交接').length;
         }
 
         function renderLoanList() {
@@ -1506,8 +1509,9 @@
                 const isOverdue = item.status === '借用中' && item.returnTime && new Date(item.returnTime).getTime() < now;
                 let statusBg = "bg-yellow-50 text-yellow-700 border-yellow-200";
                 if (item.status === '借用中') statusBg = isOverdue ? "bg-red-100 text-red-700 border-red-300" : "bg-blue-50 text-blue-700 border-blue-200";
+                if (item.status === '自取交接') statusBg = "bg-purple-50 text-purple-700 border-purple-200";
                 if (item.status === '已歸還') statusBg = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                let statusOptions = ['待領取', '借用中', '已歸還'].map(s =>
+                let statusOptions = ['待領取', '借用中', '自取交接', '已歸還'].map(s =>
                     `<option value="${s}" ${item.status === s ? 'selected' : ''}>${s}</option>`
                 ).join('');
                 let itemsHtml = "";
@@ -1546,7 +1550,8 @@ let handlerOptions = '';
                 }
                 const tr = document.createElement('tr');
                 const isReturned = item.status === '已歸還';
-                tr.style.cssText = isReturned ? 'background-color:#f3f4f6' : (item.markColor ? `background-color:${item.markColor}` : '');
+                const isSelfHandoff = item.status === '自取交接';
+                tr.style.cssText = isReturned ? 'background-color:#f3f4f6' : isSelfHandoff ? 'background-color:#faf5ff' : (item.markColor ? `background-color:${item.markColor}` : '');
                 tr.className = "transition-colors";
                 tr.innerHTML = `
                     <td class="p-4 w-10 text-center" id="th-checkbox-cell">
@@ -1868,8 +1873,8 @@ let handlerOptions = '';
                     const originalQty = loans[idx].items[invItem.name] || 0;
                     const maxAvail = getAvailableQty(invItem.name, loans[idx].useDate, loans[idx].useDate, activeInlineLoanId) + originalQty;
                     if (qty > maxAvail) {
-                        alert(`「${invItem.name}」要求的數量 (${qty}) 超過了最大可用量 (${maxAvail})！`);
-                        isOverLimit = true;
+                        const proceed2 = confirm(`⚠️「${invItem.name}」剩餘可借 ${maxAvail} 個，您申請 ${qty} 個已超出庫存！\n\n確定要繼續？`);
+                        if (!proceed2) { isOverLimit = true; }
                     }
                     updatedItems[invItem.name] = qty;
                 }
@@ -2141,8 +2146,8 @@ let handlerOptions = '';
                     const _eTs = returnTime ? new Date(returnTime).getTime() : new Date((useDate||'1970-01-01')+'T23:59:59').getTime();
                     const maxAllowed = getAvailableQtyByTime(invItem.name, _sTs, _eTs, id || null) + originalQty;
                     if (qty > maxAllowed) {
-                        alert(`「${invItem.name}」數量超過可用餘額！`);
-                        isOverLimit = true;
+                        const proceed = confirm(`⚠️「${invItem.name}」剩餘可借數量為 ${maxAllowed} 個，您申請 ${qty} 個已超出庫存！\n\n確定要繼續送出嗎？（例如假日自取交接情況）`);
+                        if (!proceed) { isOverLimit = true; }
                     }
                     selectedItems[invItem.name] = qty;
                 }
