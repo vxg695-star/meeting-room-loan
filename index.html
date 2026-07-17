@@ -1925,9 +1925,9 @@ let handlerOptions = '';
                 const avail = getAvailableQtyByTime(invItem.name, tStart, tEnd, id || null);
                 const maxAllowed = avail + originalQty;
 
-                // 警示：同一天有其他借用，顯示下一筆時間
+                // 警示：同一天有其他借用，且剩餘數量只剩 1 個時才警示
                 const nextInfo = getNextLoanOnSameDay(invItem.name, useDate, id || null);
-                const showWarn = nextInfo !== null;
+                const showWarn = nextInfo !== null && avail <= 1;
                 const warnHtml = showWarn ? (() => {
                     const nextLoan = nextInfo.loan;
                     const nextStart = nextLoan.pickupTime
