@@ -368,6 +368,15 @@
                     <label class="block text-xs font-bold text-gray-500 mb-1">備註</label>
                     <textarea id="form-notes" rows="2" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"></textarea>
                 </div>
+                <div class="col-span-2" id="form-handoff-section">
+                    <label class="block text-xs font-bold text-gray-500 mb-1">
+                        <i class="fa-solid fa-right-left mr-1 text-purple-500"></i>自取交接（選擇要交接的借用單）
+                    </label>
+                    <select id="form-handoff-target" class="w-full bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-400 text-gray-700">
+                        <option value="">— 不交接 —</option>
+                    </select>
+                    <p class="text-[11px] text-purple-500 mt-1"><i class="fa-solid fa-circle-info mr-1"></i>選擇後，此筆與目標借用單皆會自動變更為「自取交接」狀態</p>
+                </div>
                 <div class="col-span-2 border-t border-gray-100 pt-3">
                     <div class="flex justify-between items-center mb-2">
                         <label class="block text-xs font-bold text-gray-500">選擇借用物品與數量 <span class="text-red-500">*</span></label>
@@ -1374,6 +1383,26 @@
         }
         window.buildLocationDropdown = buildLocationDropdown;
 
+        function buildHandoffDropdown() {
+            const sel = document.getElementById('form-handoff-target');
+            if (!sel) return;
+            const currentId = document.getElementById('form-loan-id').value;
+            sel.innerHTML = '<option value="">— 不交接 —</option>';
+            // Show loans that are 待領取 or 借用中, excluding current
+            loans.filter(l => l.id !== currentId && (l.status === '待領取' || l.status === '借用中' || l.status === '自取交接'))
+                .forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l.id;
+                    const itemNames = Object.keys(l.items || {}).join('、');
+                    opt.textContent = `${l.useDate} ${l.borrower}（${l.dept ? l.dept.split('_').slice(1).join('_') : ''}）— ${itemNames}`;
+                    if (l.handoffTarget === currentId) opt.textContent += ' ✓已關聯';
+                    sel.appendChild(opt);
+                });
+        }
+        window.buildHandoffDropdown = buildHandoffDropdown;
+
+
+
         function handleLocationSelectChange(prefix) {
             const select = document.getElementById(`${prefix}-location`);
             const customInput = document.getElementById(`${prefix}-location-custom`);
@@ -1564,7 +1593,13 @@ let handlerOptions = '';
                         ${isOverdue ? '<div class="mt-1 text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-center"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>逾期未還</div>' : ''}
                         ${inlinePickupTimeBlock}
                     </td>
-                    <td class="px-3 py-2 font-semibold text-gray-900 text-sm whitespace-nowrap">${item.borrower}</td>
+                    <td class="px-3 py-2 text-sm">
+                        <div class="font-semibold text-gray-900 whitespace-nowrap">${item.borrower}</div>
+                        ${item.handoffTarget ? (() => {
+                            const target = loans.find(l => l.id === item.handoffTarget);
+                            return target ? '<div class="text-[10px] text-purple-500 whitespace-nowrap"><i class="fa-solid fa-right-left mr-0.5"></i>交接：' + target.borrower + '</div>' : '';
+                        })() : ''}
+                    </td>
                     <td class="px-3 py-2 text-gray-700 text-sm w-36 max-w-[144px]">${item.dept.includes("_") ? item.dept.split("_").slice(1).join("_") : item.dept}</td>
                     <td class="px-3 py-2 text-gray-500 text-sm">${item.phone}</td>
                     <td class="px-3 py-2">
@@ -1889,6 +1924,7 @@ let handlerOptions = '';
             const m = document.getElementById('loan-modal');
             const title = document.getElementById('loan-modal-title');
             buildLocationDropdown();
+            buildHandoffDropdown();
             const inputs = m.querySelectorAll('input, select, textarea');
             inputs.forEach(el => el.removeAttribute('disabled'));
             const saveBtn = m.querySelector('button[onclick="saveLoanForm()"]');
@@ -1901,6 +1937,7 @@ let handlerOptions = '';
                     : `<i class="fa-regular fa-folder-open mr-1.5 text-blue-400"></i>檢視借用單資料 (${id})`;
                 document.getElementById('form-loan-id').value = item.id;
                 document.getElementById('form-status').value = item.status || '待領取';
+                document.getElementById('form-handoff-target').value = item.handoffTarget || '';
                 document.getElementById('form-borrower').value = item.borrower;
                 document.getElementById('form-dept').value = item.dept;
                 document.getElementById('form-phone').value = item.phone;
@@ -1936,6 +1973,7 @@ let handlerOptions = '';
                 title.innerHTML = `＋ 新增借用單`;
                 document.getElementById('form-loan-id').value = "";
                 document.getElementById('form-status').value = '待領取';
+                document.getElementById('form-handoff-target').value = '';
                 document.getElementById('form-borrower').value = "";
                 document.getElementById('form-dept').value = "";
                 document.getElementById('form-phone').value = "";
@@ -2181,6 +2219,25 @@ let handlerOptions = '';
             const actionType = id ? '修改借用單' : '新增借用單';
             const detail = `借用人: ${borrower} 單位: ${dept}`;
             logAction(actionType, detail);
+
+            // 自取交接：更新兩筆狀態
+            const handoffTargetId = document.getElementById('form-handoff-target').value;
+            if (handoffTargetId) {
+                // 找到剛存的這筆
+                const thisId = id || loans[0].id; // 新增時剛 unshift 進去
+                const thisIdx = loans.findIndex(l => l.id === thisId);
+                const targetIdx = loans.findIndex(l => l.id === handoffTargetId);
+                if (thisIdx !== -1) {
+                    loans[thisIdx].status = '自取交接';
+                    loans[thisIdx].handoffTarget = handoffTargetId;
+                }
+                if (targetIdx !== -1) {
+                    loans[targetIdx].status = '自取交接';
+                    loans[targetIdx].handoffTarget = thisId;
+                }
+                logAction('自取交接', `${borrower} 與 ${targetIdx !== -1 ? loans[targetIdx].borrower : handoffTargetId} 設定交接`);
+            }
+
             saveToStorage();
             closeLoanModal();
         }
