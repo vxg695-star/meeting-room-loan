@@ -137,7 +137,9 @@
                             <tr class="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs font-medium">
                                 <th class="p-3 text-center w-16 id-sort-th">排序</th>
                                 <th class="p-3">物品名稱</th>
-                                <th class="p-3 text-center w-40">該日剩餘數 / 總限制</th>
+                                <th class="p-3 text-center w-24">剩餘 / 總數</th>
+                                <th class="p-3">下一筆借用</th>
+                                <th class="p-3">預計歸還</th>
                                 <th class="p-3 text-center w-20 id-delete-th">刪除</th>
                             </tr>
                         </thead>
@@ -1627,6 +1629,7 @@ let handlerOptions = '';
             const tbody = document.getElementById('inventory-table-body');
             tbody.innerHTML = "";
             const searchDate = document.getElementById('search-start-date').value;
+            const queryDate = searchDate || new Date().toISOString().split('T')[0];
             const thSort = document.querySelector('.id-sort-th');
             const thDelete = document.querySelector('.id-delete-th');
             if (currentUser) {
@@ -1636,11 +1639,66 @@ let handlerOptions = '';
                 if (thSort) thSort.classList.add('hidden');
                 if (thDelete) thDelete.classList.add('hidden');
             }
+
+            // 計算查詢日 00:00 ～ 23:59 的區間
+            const dayStart = new Date(queryDate + 'T00:00:00').getTime();
+            const dayEnd   = new Date(queryDate + 'T23:59:59').getTime();
+
             inventoryArray.forEach((item, index) => {
-                const currentAvailable = getAvailableQty(item.name, searchDate, searchDate);
+                const currentAvailable = getAvailableQtyByTime(item.name, dayStart, dayEnd);
                 let qtyBadgeColor = "text-blue-600 font-bold bg-blue-50";
                 if (currentAvailable === 0) qtyBadgeColor = "text-red-600 font-bold bg-red-50";
                 else if (currentAvailable <= 2) qtyBadgeColor = "text-amber-600 font-bold bg-amber-50";
+
+                // 找出當日所有借用（非已歸還），依開始時間排序
+                const dayLoans = loans.filter(loan => {
+                    if (loan.status === '已歸還') return false;
+                    if (!loan.items[item.name]) return false;
+                    const lStart = loan.pickupTime
+                        ? new Date(loan.pickupTime).getTime()
+                        : new Date(loan.useDate + 'T00:00:00').getTime();
+                    const lEnd = loan.returnTime
+                        ? new Date(loan.returnTime).getTime()
+                        : new Date(loan.useDate + 'T23:59:59').getTime();
+                    return lStart <= dayEnd && lEnd >= dayStart;
+                }).sort((a, b) => {
+                    const aT = a.pickupTime ? new Date(a.pickupTime).getTime() : 0;
+                    const bT = b.pickupTime ? new Date(b.pickupTime).getTime() : 0;
+                    return aT - bT;
+                });
+
+                // 下一筆借用 & 預計歸還資訊
+                let nextLoanHtml = '<span class="text-gray-300 text-xs">—</span>';
+                let returnInfoHtml = '<span class="text-gray-300 text-xs">—</span>';
+
+                if (dayLoans.length > 0) {
+                    const rows = dayLoans.map(loan => {
+                        const qty = loan.items[item.name] || 0;
+                        const pTime = loan.pickupTime ? loan.pickupTime.split('T')[1]?.slice(0,5) : '—';
+                        const rTime = loan.returnTime ? loan.returnTime.split('T')[1]?.slice(0,5) : '—';
+                        const statusColor = loan.status === '借用中'
+                            ? 'text-blue-600' : 'text-yellow-600';
+                        return `<div class="flex gap-1 items-center text-[11px] leading-tight">
+                            <span class="${statusColor} font-bold">${pTime}</span>
+                            <span class="text-gray-300">×${qty}</span>
+                            <span class="text-gray-500 truncate max-w-[60px]">${loan.borrower}</span>
+                        </div>`;
+                    }).join('');
+                    nextLoanHtml = rows;
+
+                    const returnRows = dayLoans.map(loan => {
+                        const qty = loan.items[item.name] || 0;
+                        const rTime = loan.returnTime ? loan.returnTime.split('T')[1]?.slice(0,5) : '—';
+                        const rDate = loan.returnTime ? loan.returnTime.split('T')[0] : loan.useDate;
+                        const diffDay = rDate !== queryDate ? ` (${rDate})` : '';
+                        return `<div class="text-[11px] leading-tight text-gray-500">
+                            <span class="font-medium">${rTime}${diffDay}</span>
+                            <span class="text-gray-300 ml-1">×${qty} ${loan.borrower}</span>
+                        </div>`;
+                    }).join('');
+                    returnInfoHtml = returnRows;
+                }
+
                 let sortControlHtml = "";
                 if (currentUser) {
                     sortControlHtml = `
@@ -1658,27 +1716,28 @@ let handlerOptions = '';
                 let quantityControlHtml = "";
                 if (currentUser) {
                     quantityControlHtml = `
-                        <input type="number" value="${item.limit}" min="1" onchange="updateInventoryLimit('${item.name}', this.value)" class="w-16 bg-gray-50 border border-gray-200 rounded text-center py-0.5 text-xs focus:outline-none focus:border-blue-500" title="修改總上限限制">
-                        <span class="text-gray-500 text-xs">個</span>`;
+                        <input type="number" value="${item.limit}" min="1" onchange="updateInventoryLimit('${item.name}', this.value)" class="w-14 bg-gray-50 border border-gray-200 rounded text-center py-0.5 text-xs focus:outline-none focus:border-blue-500" title="修改總上限限制">
+                        <span class="text-gray-400 text-xs">/ ${item.limit}</span>`;
                 } else {
-                    quantityControlHtml = `<span class="text-gray-400 text-xs font-medium">/ 總數 ${item.limit} 個</span>`;
+                    quantityControlHtml = `<span class="text-gray-400 text-xs font-medium">/ ${item.limit}</span>`;
                 }
                 let deleteButtonHtml = "";
                 if (currentUser) {
                     deleteButtonHtml = `<td class="p-3 text-center"><button onclick="deleteInventoryItem('${item.name}')" class="text-gray-300 hover:text-red-500 text-sm p-1 transition" title="移除品項"><i class="fa-regular fa-trash-can"></i></button></td>`;
                 }
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 transition-colors";
+                tr.className = "hover:bg-gray-50/80 transition-colors" + (currentAvailable === 0 ? ' bg-red-50/30' : '');
                 tr.innerHTML = `
                     ${sortControlHtml}
-                    <td class="p-3 font-medium text-gray-800">${item.name}</td>
+                    <td class="p-3 font-medium text-gray-800 text-sm">${item.name}</td>
                     <td class="p-3 text-center">
-                        <div class="inline-flex items-center space-x-2">
-                            <span class="px-2.5 py-0.5 rounded text-sm ${qtyBadgeColor}" title="該查詢日剩餘可用數">${currentAvailable}</span>
-                            ${currentUser ? '<span class="text-gray-400 text-xs">/</span>' : ''}
+                        <div class="inline-flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 rounded text-sm ${qtyBadgeColor}">${currentAvailable}</span>
                             ${quantityControlHtml}
                         </div>
                     </td>
+                    <td class="p-3">${nextLoanHtml}</td>
+                    <td class="p-3">${returnInfoHtml}</td>
                     ${deleteButtonHtml}`;
                 tbody.appendChild(tr);
             });
