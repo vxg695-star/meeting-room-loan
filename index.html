@@ -111,7 +111,7 @@
             </div>
         </div>
 
-        <div id="panel-inventory" class="hidden space-y-4 max-w-2xl">
+        <div id="panel-inventory" class="hidden space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div id="inventory-management-card" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 space-y-4 h-fit hidden">
                     <h2 class="text-base font-bold text-gray-800 flex items-center"><i class="fa-solid fa-warehouse mr-2 text-blue-500"></i>管理庫存上限設定</h2>
@@ -127,7 +127,7 @@
                     </div>
                 </div>
 
-                <div id="inventory-status-card" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden col-span-2 md:col-span-1">
+                <div id="inventory-status-card" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div class="bg-gray-100 p-3 font-bold text-sm text-gray-700 border-b border-gray-200 flex justify-between items-center">
                         <span>物品名稱</span>
                         <span id="inventory-table-title-date" class="text-xs text-blue-600 font-medium">指定日期剩餘可用數 / 總限制</span>
@@ -1672,23 +1672,43 @@ let handlerOptions = '';
                 let returnInfoHtml = '<span class="text-gray-300 text-xs">—</span>';
 
                 if (dayLoans.length > 0) {
-                    // 下一筆：所有當日借用壓成 tags
-                    nextLoanHtml = dayLoans.map(loan => {
-                        const qty = loan.items[item.name] || 0;
-                        const pTime = loan.pickupTime ? loan.pickupTime.split('T')[1]?.slice(0,5) : '—';
-                        const eTime = loan.returnTime ? loan.returnTime.split('T')[1]?.slice(0,5) : '—';
-                        const sc = loan.status === '借用中' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700';
-                        return `<span class="inline-flex items-center gap-0.5 ${sc} rounded px-1.5 py-0.5 text-[11px] font-medium mr-1 mb-0.5 whitespace-nowrap">${pTime}～${eTime} ×${qty} ${loan.borrower}</span>`;
-                    }).join('');
+                    // 只取最接近現在的下一筆借用
+                    const now = Date.now();
+                    // 找最早開始（從現在往後）的一筆，若全部已過則取最早的
+                    const upcoming = dayLoans.filter(l => {
+                        const t = l.pickupTime ? new Date(l.pickupTime).getTime() : 0;
+                        return t >= now;
+                    });
+                    const nextLoan = upcoming.length > 0 ? upcoming[0] : dayLoans[0];
+                    const nQty = nextLoan.items[item.name] || 0;
+                    const nDate = nextLoan.pickupTime ? nextLoan.pickupTime.split('T')[0] : nextLoan.useDate;
+                    const nStart = nextLoan.pickupTime ? nextLoan.pickupTime.split('T')[1]?.slice(0,5) : '—';
+                    const nEnd = nextLoan.returnTime ? nextLoan.returnTime.split('T')[1]?.slice(0,5) : '—';
+                    const nSc = nextLoan.status === '借用中' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200';
+                    nextLoanHtml = `<div class="inline-flex flex-col gap-0.5">
+                        <span class="text-[10px] text-gray-400">${nDate}</span>
+                        <span class="inline-flex items-center ${nSc} border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap">${nStart}～${nEnd} ×${nQty}</span>
+                        <span class="text-[10px] text-gray-500">${nextLoan.borrower}</span>
+                    </div>`;
+                    if (dayLoans.length > 1) {
+                        nextLoanHtml += `<span class="text-[10px] text-gray-400 ml-1">+${dayLoans.length - 1} 筆</span>`;
+                    }
 
-                    // 預計歸還：同樣壓成 tags
-                    returnInfoHtml = dayLoans.map(loan => {
-                        const qty = loan.items[item.name] || 0;
-                        const rTime = loan.returnTime ? loan.returnTime.split('T')[1]?.slice(0,5) : '—';
-                        const rDate = loan.returnTime ? loan.returnTime.split('T')[0] : loan.useDate;
-                        const diffDay = rDate !== queryDate ? `(${rDate.slice(5)})` : '';
-                        return `<span class="inline-flex items-center gap-0.5 bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 text-[11px] mr-1 mb-0.5 whitespace-nowrap">${rTime}${diffDay} ×${qty} ${loan.borrower}</span>`;
-                    }).join('');
+                    // 最接近歸還（最早歸還時間的一筆）
+                    const sortedByReturn = [...dayLoans].sort((a, b) => {
+                        const aT = a.returnTime ? new Date(a.returnTime).getTime() : 0;
+                        const bT = b.returnTime ? new Date(b.returnTime).getTime() : 0;
+                        return aT - bT;
+                    });
+                    const nearReturn = sortedByReturn[0];
+                    const rQty = nearReturn.items[item.name] || 0;
+                    const rDate = nearReturn.returnTime ? nearReturn.returnTime.split('T')[0] : nearReturn.useDate;
+                    const rTime = nearReturn.returnTime ? nearReturn.returnTime.split('T')[1]?.slice(0,5) : '—';
+                    returnInfoHtml = `<div class="inline-flex flex-col gap-0.5">
+                        <span class="text-[10px] text-gray-400">${rDate}</span>
+                        <span class="inline-flex items-center bg-gray-100 text-gray-700 border border-gray-200 rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap">${rTime} ×${rQty}</span>
+                        <span class="text-[10px] text-gray-500">${nearReturn.borrower}</span>
+                    </div>`;
                 }
 
                 let sortControlHtml = "";
