@@ -1267,17 +1267,24 @@
             return getAvailableQtyByTime(itemName, tStart, tEnd, excludeLoanId);
         }
 
-        // 取得某物品在指定時間後的下一筆借用時間（用於警示）
-        function getNextLoanTime(itemName, afterTs, excludeLoanId = null) {
+        // 取得某物品在同一天的下一筆借用（不含自身），回傳 { ts, loan } 或 null
+        function getNextLoanOnSameDay(itemName, useDate, excludeLoanId = null) {
+            if (!useDate) return null;
+            const dayStart = new Date(useDate + 'T00:00:00').getTime();
+            const dayEnd   = new Date(useDate + 'T23:59:59').getTime();
             let nearest = null;
             loans.forEach(loan => {
                 if (loan.id === excludeLoanId) return;
                 if (loan.status === '已歸還') return;
                 if (!loan.items[itemName]) return;
-                const loanStart = loan.pickupTime ? new Date(loan.pickupTime).getTime()
+                const loanStart = loan.pickupTime
+                    ? new Date(loan.pickupTime).getTime()
                     : new Date(loan.useDate + 'T00:00:00').getTime();
-                if (loanStart >= afterTs) {
-                    if (nearest === null || loanStart < nearest) nearest = loanStart;
+                // 同一天的借用
+                if (loanStart >= dayStart && loanStart <= dayEnd) {
+                    if (nearest === null || loanStart < nearest.ts) {
+                        nearest = { ts: loanStart, loan };
+                    }
                 }
             });
             return nearest;
@@ -1918,13 +1925,20 @@ let handlerOptions = '';
                 const avail = getAvailableQtyByTime(invItem.name, tStart, tEnd, id || null);
                 const maxAllowed = avail + originalQty;
 
-                // 警示：下一筆借用在 2 小時內
-                const nextTs = getNextLoanTime(invItem.name, tEnd, id || null);
-                const warningMins = nextTs ? Math.round((nextTs - tEnd) / 60000) : null;
-                const showWarn = warningMins !== null && warningMins <= 180;
-                const warnHtml = showWarn
-                    ? `<span class="text-amber-600 font-bold ml-1" title="下一筆借用在 ${warningMins} 分鐘後">⚠ ${warningMins < 60 ? warningMins + '分鐘後有人借' : Math.floor(warningMins/60) + '小時後有人借'}</span>`
-                    : '';
+                // 警示：同一天有其他借用，顯示下一筆時間
+                const nextInfo = getNextLoanOnSameDay(invItem.name, useDate, id || null);
+                const showWarn = nextInfo !== null;
+                const warnHtml = showWarn ? (() => {
+                    const nextLoan = nextInfo.loan;
+                    const nextStart = nextLoan.pickupTime
+                        ? nextLoan.pickupTime.split('T')[1]?.slice(0,5)
+                        : '—';
+                    const nextEnd = nextLoan.returnTime
+                        ? nextLoan.returnTime.split('T')[1]?.slice(0,5)
+                        : '—';
+                    const borrower = nextLoan.borrower || '';
+                    return `<span class="text-amber-600 font-bold ml-1 block text-[10px]" title="同天下一筆：${borrower} ${nextStart}～${nextEnd}">⚠ 同天另有借用 ${nextStart}～${nextEnd} (${borrower})</span>`;
+                })() : '';
 
                 const div = document.createElement('div');
                 div.className = "flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-200 text-xs" + (showWarn ? ' border-amber-300 bg-amber-50' : '');
