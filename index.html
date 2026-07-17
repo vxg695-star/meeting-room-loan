@@ -1672,31 +1672,23 @@ let handlerOptions = '';
                 let returnInfoHtml = '<span class="text-gray-300 text-xs">—</span>';
 
                 if (dayLoans.length > 0) {
-                    const rows = dayLoans.map(loan => {
+                    // 下一筆：所有當日借用壓成 tags
+                    nextLoanHtml = dayLoans.map(loan => {
                         const qty = loan.items[item.name] || 0;
                         const pTime = loan.pickupTime ? loan.pickupTime.split('T')[1]?.slice(0,5) : '—';
-                        const rTime = loan.returnTime ? loan.returnTime.split('T')[1]?.slice(0,5) : '—';
-                        const statusColor = loan.status === '借用中'
-                            ? 'text-blue-600' : 'text-yellow-600';
-                        return `<div class="flex gap-1 items-center text-[11px] leading-tight">
-                            <span class="${statusColor} font-bold">${pTime}</span>
-                            <span class="text-gray-300">×${qty}</span>
-                            <span class="text-gray-500 truncate max-w-[60px]">${loan.borrower}</span>
-                        </div>`;
+                        const eTime = loan.returnTime ? loan.returnTime.split('T')[1]?.slice(0,5) : '—';
+                        const sc = loan.status === '借用中' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700';
+                        return `<span class="inline-flex items-center gap-0.5 ${sc} rounded px-1.5 py-0.5 text-[11px] font-medium mr-1 mb-0.5 whitespace-nowrap">${pTime}～${eTime} ×${qty} ${loan.borrower}</span>`;
                     }).join('');
-                    nextLoanHtml = rows;
 
-                    const returnRows = dayLoans.map(loan => {
+                    // 預計歸還：同樣壓成 tags
+                    returnInfoHtml = dayLoans.map(loan => {
                         const qty = loan.items[item.name] || 0;
                         const rTime = loan.returnTime ? loan.returnTime.split('T')[1]?.slice(0,5) : '—';
                         const rDate = loan.returnTime ? loan.returnTime.split('T')[0] : loan.useDate;
-                        const diffDay = rDate !== queryDate ? ` (${rDate})` : '';
-                        return `<div class="text-[11px] leading-tight text-gray-500">
-                            <span class="font-medium">${rTime}${diffDay}</span>
-                            <span class="text-gray-300 ml-1">×${qty} ${loan.borrower}</span>
-                        </div>`;
+                        const diffDay = rDate !== queryDate ? `(${rDate.slice(5)})` : '';
+                        return `<span class="inline-flex items-center gap-0.5 bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 text-[11px] mr-1 mb-0.5 whitespace-nowrap">${rTime}${diffDay} ×${qty} ${loan.borrower}</span>`;
                     }).join('');
-                    returnInfoHtml = returnRows;
                 }
 
                 let sortControlHtml = "";
@@ -1729,15 +1721,15 @@ let handlerOptions = '';
                 tr.className = "hover:bg-gray-50/80 transition-colors" + (currentAvailable === 0 ? ' bg-red-50/30' : '');
                 tr.innerHTML = `
                     ${sortControlHtml}
-                    <td class="p-3 font-medium text-gray-800 text-sm">${item.name}</td>
-                    <td class="p-3 text-center">
+                    <td class="px-3 py-2 font-medium text-gray-800 text-sm">${item.name}</td>
+                    <td class="px-3 py-2 text-center">
                         <div class="inline-flex items-center gap-1.5">
                             <span class="px-2 py-0.5 rounded text-sm ${qtyBadgeColor}">${currentAvailable}</span>
                             ${quantityControlHtml}
                         </div>
                     </td>
-                    <td class="p-3">${nextLoanHtml}</td>
-                    <td class="p-3">${returnInfoHtml}</td>
+                    <td class="px-3 py-2 max-w-xs"><div class="flex flex-wrap">${nextLoanHtml}</div></td>
+                    <td class="px-3 py-2 max-w-xs"><div class="flex flex-wrap">${returnInfoHtml}</div></td>
                     ${deleteButtonHtml}`;
                 tbody.appendChild(tr);
             });
