@@ -6,6 +6,16 @@
     <title>單位借物系統表單設計</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        // 頁面一載入立刻設定日期，不等 Firebase
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const pad = n => String(n).padStart(2,'0');
+            const todayStr = today.getFullYear() + '/' + pad(today.getMonth()+1) + '/' + pad(today.getDate());
+            const el = document.getElementById('current-date');
+            if (el) el.innerText = todayStr;
+        });
+    </script>
     <style>
         body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -2257,7 +2267,8 @@ let handlerOptions = '';
         // ---- 頁面初始化 ----
         window.onload = function () {
             const today = new Date();
-            const todayStr = today.toISOString().split('T')[0];
+            const pad2 = n => String(n).padStart(2,'0');
+            const todayStr = today.getFullYear() + '-' + pad2(today.getMonth()+1) + '-' + pad2(today.getDate());
             document.getElementById('current-date').innerText = todayStr.replace(/-/g, '/');
             // document.getElementById('search-start-date').value = todayStr; // 不預設篩選日期
             updateLoginStatusUI();
