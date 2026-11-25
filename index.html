@@ -2317,7 +2317,10 @@ let handlerOptions = '';
         window.deleteLoan = deleteLoan;
 
         // ---- 頁面初始化 ----
-        window.onload = function () {
+        // 不等待外部樣式／字型全部載入（公司網路可能讓 CDN 卡住），DOM 準備好就啟動
+        const __startApp = function () {
+            if (window.__appStarted) return;
+            window.__appStarted = true;
             const today = new Date();
             const pad2 = n => String(n).padStart(2,'0');
             const todayStr = today.getFullYear() + '-' + pad2(today.getMonth()+1) + '-' + pad2(today.getDate());
@@ -2328,6 +2331,26 @@ let handlerOptions = '';
             refreshToolbarLayout();
             initFirebase();
         };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', __startApp);
+        else __startApp();
+
+        // 診斷：15 秒後若仍在載入，顯示原因
+        setTimeout(async () => {
+            const ov = document.getElementById('loading-overlay');
+            if (!ov || ov.style.display === 'none') return;
+            let msg;
+            try {
+                const t0 = Date.now();
+                const ctl = new AbortController(); setTimeout(() => ctl.abort(), 8000);
+                const r = await fetch(firebaseConfig.databaseURL + '/depts.json?shallow=true', { cache: 'no-store', signal: ctl.signal });
+                msg = `資料庫測試回應：HTTP ${r.status}（${Date.now() - t0} ms）`;
+            } catch (e) { msg = `資料庫測試失敗：${e.name} ${e.message}`; }
+            ov.innerHTML = `<div style="background:#1e293b;padding:24px 32px;border-radius:12px;max-width:460px;text-align:center;">
+                <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+                <div style="font-weight:bold;font-size:1.1rem;margin-bottom:8px;">載入逾時</div>
+                <div style="color:#94a3b8;font-size:0.85rem;line-height:1.6;">${msg}<br>已啟動：${window.__appStarted ? '是' : '否'}<br>請將此畫面截圖給管理者。</div>
+                <button onclick="location.reload()" style="margin-top:14px;background:#3b82f6;color:#fff;border:0;border-radius:8px;padding:6px 16px;cursor:pointer;">重新整理</button></div>`;
+        }, 15000);
 
     </script>
 </body>
