@@ -462,8 +462,60 @@
 
     <!-- ======= Firebase SDK ======= -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getDatabase, ref, set, get, onValue, remove, forceLongPolling } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+        // ============================================================
+        // 資料庫存取：改用 Firebase REST API（一般 HTTPS 網址）
+        // 不載入 Firebase SDK、不使用 WebSocket，避開公司網路封鎖。
+        // 提供與原本相同的 get / set / remove / onValue 用法。
+        // ============================================================
+        const POLL_MS = 5000; // 每 5 秒檢查一次資料是否有更新
+        function initializeApp(cfg) { return cfg; }
+        function getDatabase(app) { return { url: app.databaseURL.replace(/\/+$/, '') }; }
+        function ref(db, path) { return { db, path: String(path || '').replace(/^\/+|\/+$/g, '') }; }
+        function _snap(v) { return { exists: () => v !== null && v !== undefined, val: () => v }; }
+        async function _req(r, method, body) {
+            let url = `${r.db.url}/${r.path}.json`;
+            const opt = { cache: 'no-store' };
+            if (method === 'GET') {
+                opt.method = 'GET';
+            } else {
+                // 用 POST + x-http-method-override，屬於「簡單請求」，不會觸發 CORS 預檢，較不易被 Proxy 擋
+                url += `?x-http-method-override=${method}`;
+                opt.method = 'POST';
+                opt.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
+                opt.body = JSON.stringify(body === undefined ? null : body);
+            }
+            const res = await fetch(url, opt);
+            if (!res.ok) throw new Error(`資料庫 ${method} ${r.path} 失敗（HTTP ${res.status}）`);
+            return res.json();
+        }
+        const _watchers = [];
+        async function get(r) { return _snap(await _req(r, 'GET')); }
+        async function set(r, v) { await _req(r, 'PUT', v); _poke(r.path); }
+        async function remove(r) { await _req(r, 'DELETE'); _poke(r.path); }
+        function onValue(r, cb) {
+            const w = { r, last: undefined, busy: false };
+            w.tick = async (force) => {
+                if (w.busy || (!force && document.hidden)) return;
+                w.busy = true;
+                try {
+                    const v = await _req(r, 'GET');
+                    const s = JSON.stringify(v);
+                    if (s !== w.last) { w.last = s; cb(_snap(v)); }
+                } catch (e) { console.warn('讀取更新失敗', r.path, e); }
+                finally { w.busy = false; }
+            };
+            _watchers.push(w);
+            w.tick(true);
+            w.timer = setInterval(() => w.tick(false), POLL_MS);
+            return () => clearInterval(w.timer);
+        }
+        function _poke(path) {
+            _watchers.forEach(w => {
+                const p = w.r.path;
+                if (!p || p === path || path.startsWith(p + '/') || p.startsWith(path + '/')) w.tick(true);
+            });
+        }
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) _watchers.forEach(w => w.tick(true)); });
 
         // ============================================================
         // ⚠️  請將下方的 firebaseConfig 換成你自己的 Firebase 設定  ⚠️
@@ -481,8 +533,7 @@
         // ============================================================
 
         const app = initializeApp(firebaseConfig);
-forceLongPolling();
-const db = getDatabase(app);
+        const db = getDatabase(app);
 
 
         let DEPT_LIST = [
